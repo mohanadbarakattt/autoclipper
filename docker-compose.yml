@@ -1,0 +1,53 @@
+name: autoclipper
+
+services:
+  clipper:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports: ["8090:8090"]
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    depends_on: [trypost]
+
+  # ---- Self-hosted TryPost (github.com/trypostit/trypost, AGPL-3.0) ----
+  trypost:
+    image: ghcr.io/trypostit/trypost:2
+    restart: unless-stopped
+    env_file: trypost.env
+    ports:
+      - "8000:80"     # web app + REST API + MCP (/mcp/trypost)
+      - "8081:8080"   # Reverb websocket
+    volumes:
+      - trypost-storage:/var/www/html/storage/app
+    depends_on: [pgsql, redis]
+
+  pgsql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trypost
+      POSTGRES_USER: trypost
+      POSTGRES_PASSWORD: ${TRYPOST_DB_PASSWORD:?run scripts/setup.py first}
+    volumes: [trypost-db:/var/lib/postgresql/data]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes: [trypost-redis:/data]
+
+  # Free public HTTPS for TryPost OAuth callbacks (needs a domain on a free Cloudflare account).
+  # Enable with:  docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:2025.1.0
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    profiles: [tunnel]
+
+volumes:
+  trypost-storage:
+  trypost-db:
+  trypost-redis:

@@ -1,0 +1,13 @@
+{
+  "profile_name": "gta6_gaming",
+  "niche_description": "GTA 6 (Grand Theft Auto VI) stream moments: chaos, glitches, easter eggs, funny reactions",
+  "game_or_topic_filter": "Grand Theft Auto VI|GTA 6|GTA VI",
+  "layout_mode": "stacked_facecam",
+  "clip_duration": { "min": 22, "max": 58 },
+  "min_viral_score": 7.5,
+  "max_posts_per_day": 6,
+  "post_spacing_hours": 3,
+  "emote_weights": { "KEKW": 3.0, "OMEGALUL": 3.0, "LUL": 2.0, "W": 2.5, "CLIP IT": 4.0, "NO WAY": 3.0 },
+  "topic_keywords": ["lucia", "jason", "vice city", "leonida", "6 stars", "glitch", "easter egg"],
+  "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
+}

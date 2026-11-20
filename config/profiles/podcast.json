@@ -1,0 +1,13 @@
+{
+  "profile_name": "podcast",
+  "niche_description": "Podcast / interview / IRL stream clips: hot takes, surprising stories, funny exchanges, strong opinions",
+  "layout_mode": "speaker_crop",
+  "clip_duration": { "min": 25, "max": 59 },
+  "min_viral_score": 7.5,
+  "max_posts_per_day": 4,
+  "post_spacing_hours": 4,
+  "emote_weights": { "LMAO": 2.0, "W": 2.0, "L": 1.5, "FACTS": 2.5, "CAP": 2.0 },
+  "topic_keywords": [],
+  "heatmap_threshold": 0.8,
+  "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
+}

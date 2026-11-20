@@ -1,0 +1,7 @@
+{
+  "streamers": [
+    { "platform": "twitch", "channel": "your_twitch_streamer", "profile": "gaming", "live": true, "vods": true, "paused": true },
+    { "platform": "kick", "channel": "your_kick_streamer", "profile": "gaming", "live": true, "vods": false, "paused": true },
+    { "platform": "youtube", "channel": "@yourYouTubeHandle", "profile": "podcast", "live": true, "vods": true, "paused": true }
+  ]
+}

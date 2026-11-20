@@ -1,0 +1,13 @@
+{
+  "profile_name": "gaming",
+  "niche_description": "Gaming stream highlights: funny fails, clutch plays, rage moments, huge reactions",
+  "game_or_topic_filter": "",
+  "layout_mode": "auto",
+  "clip_duration": { "min": 22, "max": 58 },
+  "min_viral_score": 7.5,
+  "max_posts_per_day": 6,
+  "post_spacing_hours": 3,
+  "emote_weights": { "KEKW": 3.0, "OMEGALUL": 3.0, "LUL": 2.0, "LMAO": 2.0, "W": 2.5, "CLIP IT": 4.0, "CLIP": 3.0, "NO WAY": 3.0, "POG": 2.0, "POGGERS": 2.0, "monkaS": 2.0 },
+  "topic_keywords": ["clip", "insane", "no way", "what", "bro"],
+  "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
+}

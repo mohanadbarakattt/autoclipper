@@ -1,0 +1,9 @@
+.env
+trypost.env
+config/streamers.json
+data/
+assets/fonts/*.ttf
+__pycache__/
+*.pyc
+.venv/
+venv/
