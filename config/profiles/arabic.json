@@ -1,0 +1,18 @@
+{
+  "profile_name": "arabic",
+  "niche_description": "Arabic streams and podcasts (Egyptian / Gulf): funny moments, big reactions, hot takes. Write the hook, title and caption in Arabic.",
+  "layout_mode": "auto",
+  "clip_duration": { "min": 20, "max": 45 },
+  "min_viral_score": 7.0,
+  "max_posts_per_day": 3,
+  "post_spacing_hours": 4,
+  "heatmap_threshold": 0.75,
+  "max_vod_windows": 8,
+  "language": "ar",
+  "whisper_model": "medium",
+  "emote_weights": { "KEKW": 3.0, "LUL": 2.0, "W": 2.5, "هههه": 2.0, "ههههه": 2.5, "والله": 1.5 },
+  "topic_keywords": [],
+  "caption_style": { "font": "Arial", "words_per_line": 2, "font_size": 92 },
+  "hook_style": { "font": "Arial" },
+  "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
+}

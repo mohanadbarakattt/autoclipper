@@ -46,13 +46,15 @@ def _esc(t: str) -> str:
 def build_ass(words: list[dict], hook: str, cap: dict, hk: dict, duration: float) -> str:
     pri, hi, out = cap["primary_color"], cap["highlight_color"], cap["outline_color"]
     wpl = int(cap.get("words_per_line", 3))
+    rtl = any("֐" <= ch <= "ࣿ" for w in words[:20] for ch in w["word"])  # Arabic/Hebrew/Persian
+    spacing = 0 if rtl else 1  # letter spacing breaks Arabic letter joining in libass
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {OW}", f"PlayResY: {OH}", "WrapStyle: 0",
         "ScaledBorderAndShadow: yes", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Caption,{cap['font']},{cap['font_size']},{pri},{hi},{out},&H96000000,-1,0,0,0,100,100,1,0,1,7,3,2,70,70,{cap['margin_v']},1",
+        f"Style: Caption,{cap['font']},{cap['font_size']},{pri},{hi},{out},&H96000000,-1,0,0,0,100,100,{spacing},0,1,7,3,2,70,70,{cap['margin_v']},1",
         # BorderStyle 3 = opaque box: black text on a white pill
         f"Style: Hook,{hk['font']},{hk['font_size']},&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,22,0,8,90,90,{hk['margin_v']},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",

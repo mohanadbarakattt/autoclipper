@@ -1,13 +1,16 @@
 {
   "profile_name": "podcast",
-  "niche_description": "Podcast / interview / IRL stream clips: hot takes, surprising stories, funny exchanges, strong opinions",
+  "niche_description": "Podcast / interview clips: hot takes, surprising stories, funny exchanges, strong opinions, useful advice",
   "layout_mode": "speaker_crop",
-  "clip_duration": { "min": 25, "max": 59 },
-  "min_viral_score": 7.5,
-  "max_posts_per_day": 4,
+  "clip_duration": { "min": 25, "max": 50 },
+  "min_viral_score": 7.0,
+  "max_posts_per_day": 3,
   "post_spacing_hours": 4,
+  "heatmap_threshold": 0.75,
+  "max_vod_windows": 8,
+  "language": "en",
   "emote_weights": { "LMAO": 2.0, "W": 2.0, "L": 1.5, "FACTS": 2.5, "CAP": 2.0 },
   "topic_keywords": [],
-  "heatmap_threshold": 0.8,
+  "caption_style": { "words_per_line": 2, "font_size": 96 },
   "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
 }
