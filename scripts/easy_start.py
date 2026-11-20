@@ -66,6 +66,25 @@ def ensure_ffmpeg() -> None:
     sys.exit(1)
 
 
+def gemini_key_works(key: str) -> tuple[bool, str]:
+    """Ask Google directly instead of guessing from the key's format (key goes in a header, not the URL)."""
+    import json
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+                                 headers={"x-goog-api-key": key})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status == 200, ""
+    except urllib.error.HTTPError as e:
+        try:
+            return False, json.loads(e.read().decode()).get("error", {}).get("message", str(e))[:200]
+        except Exception:
+            return False, str(e)
+    except Exception as e:
+        return True, f"(couldn't reach Google to check: {e})"  # offline: don't block the user
+
+
 def ensure_gemini() -> None:
     if env_get("GEMINI_API_KEY"):
         return
@@ -74,10 +93,18 @@ def ensure_gemini() -> None:
     print("(Do NOT add billing - the free tier is enough.)")
     webbrowser.open("https://aistudio.google.com/apikey")
     while True:
-        key = input("\nPaste your Gemini key here and press Enter: ").strip()
-        if key.startswith("AIza") and len(key) > 30:
+        key = input("\nPaste your Gemini key here and press Enter: ").strip().strip('"').strip("'").strip()
+        if key.upper().startswith("GEMINI_API_KEY="):
+            key = key.split("=", 1)[1].strip()
+        if len(key) < 20 or " " in key:
+            print("That looks incomplete. Copy the whole key and paste it again (right-click pastes in this window).")
+            continue
+        ok, why = gemini_key_works(key)
+        if ok:
             break
-        print("That doesn't look like a Gemini key (it starts with AIza). Try again.")
+        print(f"Google rejected that key: {why}")
+        if input("Save it anyway? [y/N]: ").strip().lower() in ("y", "yes"):
+            break
     env_set("GEMINI_API_KEY", key)
     print("Saved.")
 
