@@ -140,9 +140,12 @@ def claude_json(prompt: str, timeout: int = 240) -> dict:
         raise RuntimeError("claude CLI not found")
     cmd = [exe, "-p", "--output-format", "json", "--model", CLAUDE_MODEL,
            "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task"]
+    env = dict(os.environ)
+    if not env.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)  # empty value would override the normal `claude` login
     with tempfile.TemporaryDirectory() as cwd:  # empty dir: nothing for it to touch
         p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=timeout, cwd=cwd)
+                           errors="replace", timeout=timeout, cwd=cwd, env=env)
     if p.returncode != 0:
         raise RuntimeError(f"claude CLI failed: {(p.stderr or p.stdout)[-800:]}")
     out = json.loads(p.stdout)

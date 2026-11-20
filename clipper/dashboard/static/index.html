@@ -83,7 +83,9 @@
             <div class="text-slate-300" x-text="c.gemini_json?.summary"></div>
             <div x-show="c.scheduled_at" class="text-emerald-300" x-text="'⏱ '+new Date(c.scheduled_at).toLocaleString()"></div>
             <div x-show="c.error" class="text-red-300 break-words" x-text="c.error"></div>
-            <div class="flex gap-2 pt-1">
+            <div class="flex flex-wrap gap-2 pt-1">
+              <template x-if="c.video_url"><a class="btn bg-indigo-600 hover:bg-indigo-500" :href="c.video_url" :download="`clip_${c.id}.mp4`">Download</a></template>
+              <button x-show="c.caption" class="btn" @click="copyCaption(c, $el)">Copy caption</button>
               <button class="btn" @click="post(`/api/clips/${c.id}/requeue`)">Re-queue</button>
               <button class="btn text-red-300" @click="del(`/api/clips/${c.id}`)">Delete</button>
             </div>
@@ -100,6 +102,8 @@ function app(){return{
   async j(u,o){const r=await fetch(u,o);if(!r.ok){alert((await r.text()).slice(0,300));throw r}return r.json()},
   async post(u,b){await this.j(u,{method:'POST',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):null});this.load()},
   async del(u){await this.j(u,{method:'DELETE'});this.load()},
+  async copyCaption(c, el){const tags=(c.score_json?.hashtags||[]).slice(0,5).map(t=>'#'+t.replace(/^#/,'').replace(/\s/g,'')).join(' ');
+    await navigator.clipboard.writeText(`${c.caption}\n\n${tags}`.trim());el.textContent='Copied ✓';setTimeout(()=>el.textContent='Copy caption',1500)},
   async addStreamer(){await this.post('/api/streamers',this.form);this.form.channel=''},
   async load(){
     [this.ov,this.streams,this.clips]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:''))]);

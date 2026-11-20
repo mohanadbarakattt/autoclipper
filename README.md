@@ -34,7 +34,18 @@ and TikTok through a self-hosted [TryPost](https://github.com/trypostit/trypost)
 
 Hardware: any PC that can stay on. CPU-only is fine (a clip takes a few minutes to render). Budget ~20 GB disk.
 
-## Setup (once)
+## Easy mode (Windows, 2 minutes)
+
+No Docker, no TryPost, no developer accounts. Clips land in the dashboard with **Download** and **Copy caption** buttons; you post them yourself.
+
+1. Download this repo (Code → Download ZIP, or `git clone`) and double-click **`start.bat`**.
+2. First run installs everything, then asks you to paste a free Gemini key (it opens the page for you).
+3. If Claude Code is installed, it checks you're logged in to Claude and helps you log in once. Without it, Gemini writes the hooks.
+4. Say **Y** to "start with Windows". The dashboard opens at http://localhost:8090. Add streamers there.
+
+Want hands-off posting later? Follow the full setup below to add TryPost.
+
+## Full setup with auto-posting (Docker + TryPost)
 
 **Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (free for personal use), Python 3.10+, Git.
 
