@@ -119,7 +119,8 @@ def live_info(s: dict) -> dict:
                 info.update(live=True, title=j.get("title", ""), category=", ".join(j.get("categories") or []),
                             url=j.get("webpage_url", url))
             return info
-        info["live"] = streamlink_live(url)
+        live, meta = streamlink_live(url)
+        info.update(live=live, title=meta.get("title") or "", category=meta.get("category") or "")
     except Exception as e:  # network hiccups must never kill a worker
         log.warning("live check failed for %s: %s", s["id"], e)
     return info

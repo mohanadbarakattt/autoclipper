@@ -56,7 +56,7 @@ def health():
 @app.get("/api/overview")
 def overview():
     day = time.time() - 86400
-    clips_today = db.q("SELECT COUNT(*) n FROM candidates WHERE status IN ('ready','scheduled','drafted') AND updated_at>?", (day,))[0]["n"]
+    clips_today = db.q("SELECT COUNT(*) n FROM candidates WHERE status IN ('ready','scheduled','drafted','posted') AND updated_at>?", (day,))[0]["n"]
     avg = db.q("SELECT AVG(viral_score) a FROM candidates WHERE viral_score IS NOT NULL AND updated_at>?", (day,))[0]["a"]
     live = db.q("SELECT COUNT(*) n FROM stream_status WHERE recording=1")[0]["n"]
     pending = db.q("SELECT COUNT(*) n FROM candidates WHERE status IN ('pending','analyzing','rendering')")[0]["n"]
@@ -160,6 +160,29 @@ def requeue(cid: int):
         db.update_candidate(cid, status="pending", error=None)
         return {"ok": True, "action": "reprocess"}
     raise HTTPException(409, "source footage already deleted")
+
+
+@app.get("/api/schedule")
+def schedule():
+    rows = db.q("SELECT id, streamer_id, status, viral_score, hook, title, caption, score_json, out_path, scheduled_at "
+                "FROM candidates WHERE scheduled_at IS NOT NULL AND status IN ('ready','scheduled','drafted','posted') "
+                "ORDER BY scheduled_at")
+    cutoff = time.time() - 86400
+    out = []
+    for r in rows:
+        from datetime import datetime
+        if datetime.fromisoformat(r["scheduled_at"]).timestamp() < cutoff:
+            continue
+        r["score_json"] = json.loads(r["score_json"]) if r.get("score_json") else None
+        r["video_url"] = f"/media/{Path(r['out_path']).name}" if r.get("out_path") and Path(r["out_path"]).exists() else None
+        out.append(r)
+    return out
+
+
+@app.post("/api/clips/{cid}/posted")
+def mark_posted(cid: int):
+    db.update_candidate(cid, status="posted")
+    return {"ok": True}
 
 
 @app.post("/api/clips/{cid}/approve")

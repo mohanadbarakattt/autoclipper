@@ -44,6 +44,9 @@ DEFAULT_PROFILE: dict = {
     "min_viral_score": 7.5,
     "max_posts_per_day": 6,
     "post_spacing_hours": 3,
+    # fixed daily posting slots (peak US short-form times by default)
+    "posting_times": ["12:00", "17:00", "21:00"],
+    "posting_timezone": "America/New_York",
     "cooldown_sec": 180,
     "window_before_sec": 60,
     "window_after_sec": 30,

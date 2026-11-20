@@ -64,6 +64,34 @@
     </div>
   </section>
 
+  <section class="card p-4 space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-bold">Posting schedule</h2>
+      <span class="text-xs text-slate-400">Upload at the time shown, or schedule it in TikTok / YouTube Studio / Instagram</span>
+    </div>
+    <div x-show="!sched.length" class="text-sm text-slate-500">No clips scheduled yet — they appear here as soon as one passes the score gate.</div>
+    <div class="divide-y divide-slate-800">
+      <template x-for="c in sched" :key="c.id">
+        <div class="py-2 flex flex-wrap items-center gap-3 text-sm" :class="c.status==='posted' && 'opacity-50'">
+          <div class="w-44 shrink-0">
+            <div class="font-bold" x-text="fmt(c.scheduled_at,'America/New_York')+' ET'"></div>
+            <div class="text-xs text-slate-400" x-text="fmt(c.scheduled_at)+' your time'"></div>
+          </div>
+          <div class="flex-1 min-w-[12rem]">
+            <div class="font-semibold text-amber-300" x-text="c.hook"></div>
+            <div class="text-xs text-slate-400" x-text="`#${c.id} · ${c.streamer_id} · score ${c.viral_score}`"></div>
+          </div>
+          <div class="flex gap-2">
+            <template x-if="c.video_url"><a class="btn bg-indigo-600 hover:bg-indigo-500" :href="c.video_url" :download="`clip_${c.id}.mp4`">Download</a></template>
+            <button class="btn" @click="copyCaption(c, $el)">Copy caption</button>
+            <button class="btn" x-show="c.status!=='posted'" @click="post(`/api/clips/${c.id}/posted`)">Mark posted</button>
+            <span x-show="c.status==='posted'" class="text-emerald-400 text-xs self-center">posted ✓</span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+
   <section class="space-y-3">
     <div class="flex items-center justify-between">
       <h2 class="font-bold">Clip pipeline</h2>
@@ -97,7 +125,8 @@
 </div>
 <script>
 function app(){return{
-  ov:{},health:{},streams:[],clips:[],profiles:{},filter:'',form:{platform:'twitch',channel:'',profile:'default'},
+  ov:{},health:{},streams:[],clips:[],sched:[],
+  fmt(iso,tz){return new Date(iso).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',...(tz?{timeZone:tz}:{})})},profiles:{},filter:'',form:{platform:'twitch',channel:'',profile:'default'},
   kpis(){return[['Recording now',this.ov.live_recording],['Clips (24h)',this.ov.clips_today],['Avg score (24h)',this.ov.avg_score_24h],['In queue',this.ov.queue],['Data on disk',(this.ov.data_gb??0)+' GB']]},
   async j(u,o){const r=await fetch(u,o);if(!r.ok){alert((await r.text()).slice(0,300));throw r}return r.json()},
   async post(u,b){await this.j(u,{method:'POST',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):null});this.load()},
@@ -106,7 +135,7 @@ function app(){return{
     await navigator.clipboard.writeText(`${c.caption}\n\n${tags}`.trim());el.textContent='Copied ✓';setTimeout(()=>el.textContent='Copy caption',1500)},
   async addStreamer(){await this.post('/api/streamers',this.form);this.form.channel=''},
   async load(){
-    [this.ov,this.streams,this.clips]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:''))]);
+    [this.ov,this.streams,this.clips,this.sched]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:'')),this.j('/api/schedule')]);
   },
   async init(){this.profiles=await this.j('/api/profiles');this.health=await this.j('/api/health');this.load();
     setInterval(()=>this.j('/api/streams').then(s=>this.streams=s),3000);

@@ -114,9 +114,11 @@ def ytdlp_audio(url: str, dst_noext: Path, timeout: float = 3600) -> Path | None
     return next(iter(sorted(dst_noext.parent.glob(dst_noext.name + ".*"))), None)
 
 
-def streamlink_live(url: str) -> bool:
+def streamlink_live(url: str) -> tuple[bool, dict]:
+    """(is_live, metadata) - metadata has title/category/author for Twitch and Kick, no API keys needed."""
     p = run([*STREAMLINK, "--json", url], timeout=60, check=False)
     try:
-        return "streams" in json.loads(p.stdout or "{}")
+        d = json.loads(p.stdout or "{}")
+        return "streams" in d, d.get("metadata") or {}
     except json.JSONDecodeError:
-        return False
+        return False, {}

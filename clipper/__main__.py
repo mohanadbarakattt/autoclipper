@@ -53,15 +53,20 @@ async def vod_loop() -> None:
 
 
 async def processor_loop() -> None:
+    from .processor import export
+    last_backfill = 0.0
     while True:
         worked = await asyncio.to_thread(pipeline.run_once)
         if not worked:
+            if time.time() - last_backfill > 600:
+                last_backfill = time.time()
+                await asyncio.to_thread(export.backfill)
             await asyncio.sleep(10)
 
 
 def cleanup() -> None:
     cutoff = time.time() - KEEP_PUBLISHED_DAYS * 86400
-    for r in db.q("SELECT id, out_path FROM candidates WHERE status IN ('scheduled','drafted') AND updated_at < ?", (cutoff,)):
+    for r in db.q("SELECT id, out_path FROM candidates WHERE status IN ('scheduled','drafted','posted') AND updated_at < ?", (cutoff,)):
         if r["out_path"]:
             Path(r["out_path"]).unlink(missing_ok=True)
     for r in db.q("SELECT raw_path FROM candidates WHERE status IN ('rejected','failed') AND updated_at < ?", (time.time() - 86400,)):

@@ -9,7 +9,7 @@ from pathlib import Path
 from .. import db
 from ..config import READY_DIR, WORK_DIR, load_profile
 from ..media import cut, make_proxy, probe
-from . import ai, publish, render
+from . import ai, export, publish, render
 
 log = logging.getLogger("pipeline")
 
@@ -98,6 +98,10 @@ def publish_candidate(cid: int) -> None:
     except Exception as e:
         log.exception("publish failed for %s", cid)
         db.update_candidate(cid, status="publish_failed", error=str(e)[:1000])
+    try:
+        export.export_clip(cid)
+    except Exception:
+        log.exception("export to EXPORT_DIR failed for %s", cid)
 
 
 def run_once() -> bool:

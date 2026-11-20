@@ -60,23 +60,35 @@ class TryPost:
 
 
 def next_slot(profile: dict) -> datetime:
-    """Space posts per profile; cap per UTC day."""
-    spacing = timedelta(hours=float(profile["post_spacing_hours"]))
-    cap = int(profile["max_posts_per_day"])
-    now = datetime.now(timezone.utc)
-    rows = db.q("SELECT scheduled_at FROM candidates WHERE profile=? AND scheduled_at IS NOT NULL", (profile["_file"],))
-    taken = sorted(datetime.fromisoformat(r["scheduled_at"]) for r in rows)
-    slot = max(now + timedelta(minutes=10), (taken[-1] + spacing) if taken else now)
-    while sum(1 for t in taken if t.date() == slot.date()) >= cap:
-        slot = datetime.combine(slot.date() + timedelta(days=1), datetime.min.time(), timezone.utc) + timedelta(hours=14)
-    return slot.replace(microsecond=0)
+    """Next free posting time (UTC). Uses the profile's fixed daily `posting_times` in `posting_timezone`
+    (one shared queue across all profiles, since they usually post to the same accounts)."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(profile.get("posting_timezone") or "America/New_York")
+    times = sorted(profile.get("posting_times") or [])[: int(profile["max_posts_per_day"])]
+    earliest = datetime.now(timezone.utc) + timedelta(minutes=20)
+    taken = [datetime.fromisoformat(r["scheduled_at"]) for r in
+             db.q("SELECT scheduled_at FROM candidates WHERE scheduled_at IS NOT NULL AND status NOT IN ('rejected','failed')")]
+    taken = [t if t.tzinfo else t.replace(tzinfo=timezone.utc) for t in taken]
+    if not times:  # fallback: fixed spacing
+        spacing = timedelta(hours=float(profile["post_spacing_hours"]))
+        return max([earliest] + [t + spacing for t in taken]).replace(microsecond=0)
+    day = earliest.astimezone(tz).date()
+    for d in range(90):
+        date = day + timedelta(days=d)
+        for t in times:
+            hh, mm = (int(x) for x in t.split(":"))
+            cand = datetime(date.year, date.month, date.day, hh, mm, tzinfo=tz).astimezone(timezone.utc)
+            if cand >= earliest and not any(abs((cand - x).total_seconds()) < 600 for x in taken):
+                return cand
+    return earliest
 
 
 def publish(cand: dict, profile: dict) -> dict:
     tp = TryPost()
     pub = profile["publish"]
     if pub.get("mode") == "off" or not tp.configured:
-        return {"status": "ready", "note": "publishing off or TRYPOST_API_KEY not set"}
+        # manual posting: still give every clip its own slot in the schedule
+        return {"status": "ready", "scheduled_at": next_slot(profile).isoformat()}
     accts = [a for a in tp.accounts() if a.get("status") == "connected" and a.get("platform") in CONTENT_TYPES]
     if pub.get("account_ids"):
         accts = [a for a in accts if a["id"] in pub["account_ids"]]
