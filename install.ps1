@@ -10,14 +10,26 @@ function Say($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
 function Refresh-Path {
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
 }
+function Works($cmd) {
+    # 'python' can be the Microsoft Store stub (WindowsApps\python.exe), which exists but isn't Python.
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { return $false }
+    if ($cmd -eq 'python') {
+        try { & python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>$null | Out-Null } catch { return $false }
+        return ($LASTEXITCODE -eq 0)
+    }
+    return $true
+}
 function Need($cmd, $id, $name) {
-    if (Get-Command $cmd -ErrorAction SilentlyContinue) { return }
+    if (Works $cmd) { return }
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "$name is missing and winget isn't available. Install $name manually, then run this again."
     }
     Say "Installing $name (approve the Windows prompt if one appears)..."
     winget install --id $id -e --silent --accept-source-agreements --accept-package-agreements | Out-Null
     Refresh-Path
+    if (-not (Works $cmd)) {
+        throw "$name was installed but this window can't see it yet. Close PowerShell, open a new one and paste the install line again."
+    }
 }
 
 Say 'AutoClipper installer'

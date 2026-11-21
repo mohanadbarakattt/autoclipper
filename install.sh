@@ -5,7 +5,7 @@ set -e
 DEST="$HOME/AutoClipper"
 if [ "$(uname)" = "Darwin" ]; then
   command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
-  command -v python3 >/dev/null || brew install python
+  python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null || brew install python
   command -v ffmpeg  >/dev/null || brew install ffmpeg
 elif command -v apt-get >/dev/null; then
   { command -v python3 >/dev/null && python3 -m venv --help >/dev/null 2>&1; } || sudo apt-get install -y python3 python3-venv
@@ -22,4 +22,5 @@ done)
 rm -rf "$TMP"
 chmod +x "$DEST/start.sh"
 echo "Installed to $DEST - starting..."
-exec "$DEST/start.sh"
+# stdin is this script (piped from curl), so give the first-run questions the keyboard
+if [ -t 0 ] || ! { : </dev/tty; } 2>/dev/null; then exec "$DEST/start.sh"; else exec "$DEST/start.sh" </dev/tty; fi

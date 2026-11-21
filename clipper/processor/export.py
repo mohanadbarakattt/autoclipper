@@ -18,7 +18,7 @@ from .. import db
 
 log = logging.getLogger("export")
 SHOW_TZ = os.getenv("SCHEDULE_TIMEZONE", "America/New_York")
-LOCAL_TZ = os.getenv("LOCAL_TIMEZONE", "Africa/Cairo")
+LOCAL_TZ = os.getenv("LOCAL_TIMEZONE", "").strip()  # empty = this PC's timezone
 
 
 def _safe(name: str) -> str:
@@ -28,15 +28,15 @@ def _safe(name: str) -> str:
 
 def export_clip(cid: int) -> Path | None:
     root = os.getenv("EXPORT_DIR", "").strip()
-    if not root:
-        return None
+    if not root or not Path(root).anchor or not Path(Path(root).anchor).exists():
+        return None  # not set, or the drive (e.g. Google Drive) isn't mounted yet; backfill() retries later
     c = db.q("SELECT * FROM candidates WHERE id=?", (cid,))[0]
     if not c.get("out_path") or not Path(c["out_path"]).exists():
         return None
     score = json.loads(c["score_json"] or "{}")
     when = datetime.fromisoformat(c["scheduled_at"]) if c.get("scheduled_at") else datetime.now(timezone.utc)
     when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
-    show, local = when.astimezone(ZoneInfo(SHOW_TZ)), when.astimezone(ZoneInfo(LOCAL_TZ))
+    show, local = when.astimezone(ZoneInfo(SHOW_TZ)), (when.astimezone(ZoneInfo(LOCAL_TZ)) if LOCAL_TZ else when.astimezone())
     from ..config import load_profile
     raw_sub = (load_profile(c["profile"]).get("export_subdir") or "").strip() if c.get("profile") else ""
     sub = _safe(raw_sub) if raw_sub else ""
@@ -50,7 +50,7 @@ def export_clip(cid: int) -> Path | None:
     tags = " ".join("#" + t.lstrip("#").replace(" ", "") for t in score.get("hashtags", [])[:5])
     streamer = (c.get("streamer_id") or "").split(":", 1)[-1]
     (folder / f"{base}.txt").write_text(
-        f"POST AT:  {show:%a %d %b %H:%M} {show.tzname()}  =  {local:%a %d %b %H:%M} Cairo\n"
+        f"POST AT:  {show:%a %d %b %H:%M} {show.tzname()}  =  {local:%a %d %b %H:%M} your time\n"
         f"SCORE:    {c.get('viral_score')}   (streamer: {streamer})\n\n"
         f"YOUTUBE TITLE:\n{c.get('title')}\n\n"
         f"CAPTION (TikTok / Reels / Shorts description):\n{c.get('caption')}\n\n{tags}\n",
