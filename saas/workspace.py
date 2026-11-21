@@ -122,7 +122,7 @@ def channel_profile(ch: dict, plan: dict) -> dict:
 def sync(user_id: int) -> list[dict]:
     """Write the user's channels + styles into their workspace. Returns the active channels."""
     user = store.one("SELECT * FROM users WHERE id=?", (user_id,))
-    plan = settings.plan(user["plan"] if user else None)
+    plan = settings.limits(user) if user else settings.plan(None)
     ws = root(user_id)
     prof_dir = ws / "config" / "profiles"
     prof_dir.mkdir(parents=True, exist_ok=True)
@@ -290,3 +290,32 @@ def remove_clip(user_id: int, cid: int) -> None:
     import time
     _write(user_id, "UPDATE candidates SET status='rejected', out_path=NULL, scheduled_at=NULL, error=?, updated_at=? "
            "WHERE id=?", ("deleted by you", time.time(), int(cid)))
+
+
+# ---------- channels (shared by the web app and the service API) ----------
+RIGHTS = ("own", "permission", "campaign", "other")
+
+
+def add_channel(user: dict, link: str, platform: str, style: str, rights: str, note: str = "", ip: str = "") -> dict:
+    """Validate and add a channel. Raises ChannelError with a user-facing reason."""
+    import time
+    plat, name = parse_channel(link, platform)
+    if rights not in RIGHTS:
+        raise ChannelError("Tell us why you can clip this channel.")
+    if store.is_blocked(plat, name):
+        raise ChannelError("This streamer has asked not to be clipped.")
+    lim = settings.limits(user)
+    have = store.one("SELECT COUNT(*) n FROM channels WHERE user_id=?", (user["id"],))["n"]
+    if have >= lim["channels"]:
+        raise ChannelError(f"Your {lim['label']} plan has {lim['channels']} channel(s). Upgrade to add more.")
+    if store.one("SELECT 1 FROM channels WHERE user_id=? AND platform=? AND lower(channel)=lower(?)",
+                 (user["id"], plat, name)):
+        raise ChannelError("You already added this channel.")
+    now = time.time()
+    cid = store.x("INSERT INTO channels (user_id, platform, channel, style, rights_basis, rights_note, rights_ip,"
+                  " rights_at, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                  (user["id"], plat, name, style if style in settings.STYLES else "default", rights,
+                   (note or "")[:500], ip, now, now))
+    sync(user["id"])
+    store.x("UPDATE users SET last_scan_at=NULL WHERE id=?", (user["id"],))
+    return store.one("SELECT * FROM channels WHERE id=?", (cid,))

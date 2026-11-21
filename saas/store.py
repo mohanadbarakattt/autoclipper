@@ -63,6 +63,16 @@ CREATE TABLE IF NOT EXISTS usage (
     at REAL NOT NULL,
     PRIMARY KEY (user_id, kind, ref)
 );
+CREATE TABLE IF NOT EXISTS charges (
+    user_id INTEGER NOT NULL,
+    clip_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',   -- pending | paid | insufficient | error
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_try_at REAL NOT NULL,
+    error TEXT,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (user_id, clip_id)
+);
 CREATE TABLE IF NOT EXISTS blocked_channels (
     platform TEXT NOT NULL,
     channel TEXT NOT NULL,
@@ -83,6 +93,11 @@ def conn() -> sqlite3.Connection:
             _conn.execute("PRAGMA journal_mode=WAL")
             _conn.execute("PRAGMA foreign_keys=ON")
             _conn.executescript(SCHEMA)
+            have = {r[1] for r in _conn.execute("PRAGMA table_info(users)")}
+            for col in ("ext_id", "tier"):  # Virlo Studio link (added after M1)
+                if col not in have:
+                    _conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            _conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ext ON users(ext_id)")
             # a worker that died mid-job: put its jobs back in the queue
             _conn.execute("UPDATE jobs SET status='queued' WHERE status='running'")
             _conn.commit()

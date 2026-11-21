@@ -15,15 +15,16 @@ import threading
 import time
 from pathlib import Path
 
-from . import settings, store, workspace
+from . import billing, settings, store, workspace
 
 log = logging.getLogger("worker")
 BACKOFF = [300, 1200]
 
 
 def remaining(user: dict) -> tuple[dict, int, int]:
-    p = settings.plan(user["plan"])
-    return p, max(0, p["clips"] - store.usage(user["id"], "clip")), max(0, p["moments"] - store.usage(user["id"], "moment"))
+    """(limits, clips the user can still get, AI checks left this month)."""
+    lim = settings.limits(user)
+    return lim, billing.clips_allowed(user), max(0, lim["moments"] - store.usage(user["id"], "moment"))
 
 
 def enqueue(user_id: int, delay: float = 0) -> int | None:
@@ -87,6 +88,8 @@ def run_job(job: dict) -> None:
             raise RuntimeError(f"engine exited {p.returncode}: {tail}")
         summary = json.loads(p.stdout.strip().splitlines()[-1])
         store.add_usage(uid, "clip", summary.get("rendered", []))
+        billing.record(uid, summary.get("rendered", []))
+        billing.settle_due(uid)
         store.add_usage(uid, "moment", summary.get("checked_ids", []))
         store.x("UPDATE jobs SET status='done', finished_at=?, result=?, error=NULL WHERE id=?",
                 (time.time(), json.dumps({k: v for k, v in summary.items() if k != "checked_ids"}), job["id"]))
@@ -112,6 +115,7 @@ def loop(stop: threading.Event | None = None) -> None:
     log.info("worker started: %s parallel runs, scan every %s min", settings.MAX_PARALLEL_JOBS, settings.SCAN_MINUTES)
     while not stop.is_set():
         try:
+            billing.settle_due()
             schedule_due()
             running = [t for t in running if t.is_alive()]
             while len(running) < settings.MAX_PARALLEL_JOBS:

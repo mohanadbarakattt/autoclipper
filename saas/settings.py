@@ -51,7 +51,32 @@ PLANS: dict[str, dict] = {
 }
 MOMENTS_PER_CLIP = 15
 
+# ---------- Clips inside Virlo Studio (docs/VIRLO_INTEGRATION.md) ----------
+SAAS_MODE = os.getenv("SAAS_MODE", "app")          # app = standalone site | service = API for Virlo Studio
+BILLING = os.getenv("BILLING", "local")            # local = plan quotas here | virlo = points in Virlo Studio
+SERVICE_TOKEN = os.getenv("CLIPS_SERVICE_TOKEN", "")
+MEDIA_SECRET = os.getenv("SAAS_MEDIA_SECRET", "") or SERVICE_TOKEN
+MEDIA_TTL_SEC = int(os.getenv("SAAS_MEDIA_TTL_SEC", str(6 * 3600)))
+PUBLIC_URL = os.getenv("SAAS_PUBLIC_URL", "").rstrip("/")   # e.g. https://clips-api.virlo.studio
+VIRLO_URL = os.getenv("VIRLO_URL", "").rstrip("/")           # e.g. https://virlo.studio
+# Virlo tier -> limits here (clips themselves are paid in Virlo points; `moments` = monthly AI-check cap)
+VIRLO_TIERS: dict[str, dict] = {
+    "free":     {"label": "Free",     "channels": 1,  "scorer": "gemini", "history_days": 7,  "campaign_rules": False, "moments": 300},
+    "creator":  {"label": "Creator",  "channels": 3,  "scorer": "auto",   "history_days": 30, "campaign_rules": True,  "moments": 2000},
+    "pro":      {"label": "Pro",      "channels": 5,  "scorer": "auto",   "history_days": 60, "campaign_rules": True,  "moments": 6000},
+    "studio":   {"label": "Studio",   "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000},
+    "business": {"label": "Business", "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000},
+}
+
 
 def plan(name: str | None) -> dict:
     p = PLANS.get(name or "free", PLANS["free"])
     return {**p, "name": name if name in PLANS else "free", "moments": p["clips"] * MOMENTS_PER_CLIP}
+
+
+def limits(user: dict) -> dict:
+    """What a user may do: a Virlo tier for Virlo-linked users, else a local plan."""
+    if user.get("ext_id") and user.get("tier"):
+        t = VIRLO_TIERS.get(user["tier"], VIRLO_TIERS["free"])
+        return {**t, "name": user["tier"], "clips": None, "billing": "virlo"}
+    return {**plan(user.get("plan")), "billing": "local"}

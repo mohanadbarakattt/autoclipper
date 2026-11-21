@@ -237,27 +237,10 @@ def add_channel(request: Request, user: dict = Depends(need_user), link: str = F
                 origin: str = Form("channels")):
     src = "/app/onboarding" if origin == "onboarding" else "/app/channels"
     try:
-        plat, name = workspace.parse_channel(link, platform)
+        ch = workspace.add_channel(user, link, platform, style, rights, rights_note, _ip(request))
     except workspace.ChannelError as e:
         return back(src, err=str(e))
-    if rights not in RIGHTS:
-        return back(src, err="Tell us why you can clip this channel.")
-    if store.is_blocked(plat, name):
-        return back(src, err="This streamer has asked not to be clipped on Virlo Studio.")
-    p = settings.plan(user["plan"])
-    have = store.one("SELECT COUNT(*) n FROM channels WHERE user_id=?", (user["id"],))["n"]
-    if have >= p["channels"]:
-        return back(src, err=f"Your {p['label']} plan has {p['channels']} channel(s). Upgrade to add more.")
-    if store.one("SELECT 1 FROM channels WHERE user_id=? AND platform=? AND lower(channel)=lower(?)",
-                 (user["id"], plat, name)):
-        return back(src, err="You already added this channel.")
-    now = time.time()
-    store.x("INSERT INTO channels (user_id, platform, channel, style, rights_basis, rights_note, rights_ip, rights_at,"
-            " created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-            (user["id"], plat, name, style if style in settings.STYLES else "default", rights, rights_note[:500],
-             _ip(request), now, now))
-    workspace.sync(user["id"])
-    store.x("UPDATE users SET last_scan_at=NULL WHERE id=?", (user["id"],))
+    name = ch["channel"]
     worker.enqueue(user["id"])
     return back("/app", msg=f"Added {name}. We're scanning the latest streams now; first clips usually arrive in 20-40 minutes.")
 
@@ -393,3 +376,19 @@ def account_delete(request: Request, user: dict = Depends(need_user), confirm: s
     resp = RedirectResponse("/?msg=" + quote("Your account and clips were deleted."), status_code=303)
     resp.delete_cookie(COOKIE)
     return resp
+
+
+# ---------- service API for Virlo Studio ----------
+from . import api  # noqa: E402
+
+app.include_router(api.router)
+app.add_exception_handler(api.ApiError, api.api_error_handler)
+SERVICE_PATHS = ("/v1/", "/media/", "/health")
+
+
+@app.middleware("http")
+async def service_mode_only_api(request: Request, call_next):
+    """SAAS_MODE=service: the standalone pages are off; only the API, media links and health answer."""
+    if settings.SAAS_MODE == "service" and not request.url.path.startswith(SERVICE_PATHS):
+        return JSONResponse({"error": "not_found"}, status_code=404)
+    return await call_next(request)
