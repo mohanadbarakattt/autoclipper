@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Clips · Virlo Studio{% endblock %}
+{% block content %}
+<div class="row between wrap-row">
+  <h1>Clips</h1>
+  <form class="search" method="get"><input type="hidden" name="status" value="{{ status }}"><input name="q" value="{{ q }}" placeholder="Search hooks, captions, streamers"></form>
+</div>
+<nav class="tabs">
+  {% for key, label in [('', 'All'), ('ready', 'Ready'), ('scheduled', 'Scheduled'), ('posted', 'Posted'), ('working', 'Being checked'), ('skipped', 'Skipped')] %}
+  <a href="/app/clips?status={{ key }}" class="{{ 'on' if status == key }}">{{ label }}</a>
+  {% endfor %}
+</nav>
+{% if clips %}
+<div class="clips">{% for c in clips %}{% include "_clip_card.html" %}{% endfor %}</div>
+{% else %}
+<div class="card empty"><b>Nothing here yet.</b><p class="muted">Clips show up as soon as they're edited. Check <a href="/app/activity">Activity</a> to see what the AI is looking at.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+<form method="post" action="/app/channels" class="form wizard">
+  <input type="hidden" name="origin" value="{{ origin }}">
+  <div class="step">
+    <div class="num">1</div>
+    <div class="grow">
+      <label>Channel link
+        <input name="link" required placeholder="twitch.tv/name, kick.com/name or youtube.com/@name" autocomplete="off">
+      </label>
+      <details class="muted small"><summary>Only have a name?</summary>
+        <label>Platform
+          <select name="platform"><option value="">Pick one</option><option value="twitch">Twitch</option><option value="kick">Kick</option><option value="youtube">YouTube</option></select>
+        </label>
+      </details>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">2</div>
+    <div class="grow">
+      <span class="label">Style</span>
+      <div class="chips">
+        {% for key, label in STYLES.items() %}
+        <label class="chip"><input type="radio" name="style" value="{{ key }}" {{ 'checked' if key == 'gaming' }}> {{ label }}</label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">3</div>
+    <div class="grow">
+      <span class="label">Why can you clip this channel?</span>
+      <div class="chips col">
+        {% for key, label in RIGHTS.items() %}
+        <label class="chip"><input type="radio" name="rights" value="{{ key }}" required> {{ label }}</label>
+        {% endfor %}
+      </div>
+      <input name="rights_note" placeholder="Campaign link or note (optional)" maxlength="500">
+    </div>
+  </div>
+  <button class="btn big" type="submit">Start clipping</button>
+</form>

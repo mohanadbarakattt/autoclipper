@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Account · Virlo Studio{% endblock %}
+{% block content %}
+<h1>Account</h1>
+<div class="card">
+  <p><b>{{ user.email }}</b></p>
+  <p>{{ usage.plan.label }} plan · {{ usage.used }} of {{ usage.plan.clips }} clips used this month</p>
+  <div class="bar"><div style="width: {{ usage.pct }}%"></div></div>
+  <p class="muted small">Clip history is kept {{ usage.plan.history_days }} days. Upgrades open soon.</p>
+  <form method="post" action="/logout"><button class="btn ghost small">Log out</button></form>
+</div>
+<div class="card">
+  <b>Delete account</b>
+  <p class="muted small">Deletes your account, channels and every clip. This can't be undone.</p>
+  <form method="post" action="/app/account/delete" class="form inline">
+    <input name="confirm" placeholder="Type your email to confirm">
+    <button class="btn danger small">Delete everything</button>
+  </form>
+</div>
+{% endblock %}

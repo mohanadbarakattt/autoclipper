@@ -4,6 +4,8 @@
 - Claude runs through the Claude Code CLI in headless mode (`claude -p`) on YOUR existing
   Claude subscription (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`). No Anthropic API key.
   If Claude isn't available, Gemini does the scoring too.
+- Hosted / commercial use: set ANTHROPIC_API_KEY and Claude is called through the Anthropic API instead
+  (a personal Claude subscription must not be used to serve other people).
 """
 from __future__ import annotations
 
@@ -28,6 +30,10 @@ GEMINI_CHAIN = list(dict.fromkeys([GEMINI_MODEL, "gemini-flash-latest", "gemini-
 GEMINI_TIMEOUT_MS = int(os.getenv("GEMINI_TIMEOUT_SEC", "90")) * 1000
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "sonnet")
 SCORER = os.getenv("SCORER", "auto")  # auto | claude | gemini
+# low = ~3x fewer video tokens for the 480p proxy (cheaper on a paid Gemini key); empty = Gemini's default
+GEMINI_MEDIA_RESOLUTION = os.getenv("GEMINI_MEDIA_RESOLUTION", "").strip().lower()
+# CLI aliases -> Anthropic API model ids (any full id is passed through)
+API_MODELS = {"sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5", "haiku": "claude-haiku-5-5"}
 
 
 class TrackPoint(BaseModel):
@@ -164,8 +170,11 @@ layout_hint: stacked_facecam if gameplay + webcam overlay; speaker_crop if one/t
 payoff_sec: the exact second of the punchline / biggest reaction (used for a zoom-in).
 action_track: horizontal position (0-1000) of the main action or speaker every ~3 seconds from start_sec to end_sec
 (ignore the webcam overlay; follow the game action or the person talking), so a vertical crop can follow it."""
+        extra = {}
+        if GEMINI_MEDIA_RESOLUTION in ("low", "medium", "high"):
+            extra["media_resolution"] = getattr(types.MediaResolution, f"MEDIA_RESOLUTION_{GEMINI_MEDIA_RESOLUTION.upper()}")
         resp = _gen([f, prompt], types.GenerateContentConfig(response_mime_type="application/json",
-                                                             response_schema=Verdict, temperature=0.2))
+                                                             response_schema=Verdict, temperature=0.2, **extra))
         return _extract_json(resp.text)
     finally:
         try:
@@ -186,7 +195,33 @@ def claude_bin() -> str | None:
     return os.getenv("CLAUDE_BIN") or shutil.which("claude")
 
 
+_anthropic = None
+
+
+def _claude_api_json(prompt: str, timeout: int) -> dict:
+    """Claude through the Anthropic API (ANTHROPIC_API_KEY): for hosted/commercial use."""
+    global _anthropic
+    import anthropic
+    if _anthropic is None:
+        _anthropic = anthropic.Anthropic(timeout=float(timeout), max_retries=2)
+    model = API_MODELS.get(CLAUDE_MODEL, CLAUDE_MODEL)
+    resp = _anthropic.beta.messages.create(
+        model=model,
+        max_tokens=16000,
+        output_config={"effort": "low"},  # short scoring task: low effort keeps it fast and cheap
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",  # a policy decline is retried on a fallback model inside the same call
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("claude declined to score this clip")
+    text = "".join(b.text for b in resp.content if b.type == "text")
+    return _extract_json(text)
+
+
 def claude_json(prompt: str, timeout: int = 240) -> dict:
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return _claude_api_json(prompt, timeout)
     exe = claude_bin()
     if not exe:
         raise RuntimeError("claude CLI not found")
@@ -210,7 +245,7 @@ _claude_off_until = 0.0
 
 
 def _claude_available() -> bool:
-    return bool(claude_bin()) and time.time() > _claude_off_until
+    return bool(os.getenv("ANTHROPIC_API_KEY") or claude_bin()) and time.time() > _claude_off_until
 
 
 def score_clip(transcript: str, verdict: dict, profile: dict, platform: str, streamer: str,

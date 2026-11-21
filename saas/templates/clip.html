@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ c.hook or 'Clip' }} · Virlo Studio{% endblock %}
+{% block content %}
+<a href="/app/clips" class="small">← All clips</a>
+<div class="detail">
+  <div class="player">
+    {% if c.done %}
+    <video src="/app/clips/{{ c.id }}/video" poster="/app/clips/{{ c.id }}/thumb" controls playsinline preload="metadata"></video>
+    {% else %}
+    <div class="ph tall">{{ c.label }}</div>
+    {% endif %}
+  </div>
+  <div class="side">
+    <div class="row gap">
+      <span class="tag {{ c.status }}">{{ c.label }}</span>
+      {% if c.viral_score %}<span class="tag">Score {{ '%.1f' % c.viral_score }}</span>{% endif %}
+      {% if c.views %}<span class="tag ready">{{ '{:,}'.format(c.views) }} views</span>{% endif %}
+    </div>
+    <h1>{{ c.hook or c.title or 'Clip #' ~ c.id }}</h1>
+    <p class="muted small">{{ c.channel }}{% if c.scheduled_at %} · posting slot {{ c.scheduled_at | when }}{% endif %}</p>
+
+    {% if c.done %}
+    <div class="row gap">
+      <a class="btn" href="/app/clips/{{ c.id }}/video?download=1">Download</a>
+      <button class="btn ghost" type="button" data-copy="caption">Copy caption</button>
+    </div>
+    {% endif %}
+
+    {% if c.gemini_json.summary or c.error %}
+    <div class="card why">
+      <b>Why this was {{ 'skipped' if c.status in ('rejected', 'failed') else 'picked' }}</b>
+      <p>{{ c.gemini_json.summary or '' }}</p>
+      {% if c.status in ('rejected', 'failed') and c.error %}<p class="muted small">{{ c.error }}</p>
+      {% elif c.gemini_json.reason %}<p class="muted small">{{ c.gemini_json.reason }}</p>{% endif %}
+      {% if c.trigger %}<p class="muted small">Found by: {{ c.trigger }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if c.done %}
+    <form method="post" action="/app/clips/{{ c.id }}" class="form">
+      <label>Title (YouTube)<input name="title" value="{{ c.title or '' }}" maxlength="200"></label>
+      <label>Caption<textarea name="caption" id="caption" rows="4" maxlength="2200">{{ c.caption or '' }}</textarea></label>
+      <label>Hashtags<input name="hashtags" id="hashtags" value="{{ c.hashtags | join(' ') }}"></label>
+      <button class="btn ghost" type="submit">Save text</button>
+    </form>
+
+    <form method="post" action="/app/clips/{{ c.id }}/posted" class="form card">
+      <b>Posted it?</b>
+      <label class="muted small">Paste the post link(s) and we'll track views and learn what works on your page.
+        <input name="url" value="{{ c.post_url or '' }}" placeholder="https://www.tiktok.com/@you/video/…">
+      </label>
+      <button class="btn" type="submit">{{ 'Update link' if c.status == 'posted' else 'Mark as posted' }}</button>
+    </form>
+    {% endif %}
+
+    <form method="post" action="/app/clips/{{ c.id }}/delete" onsubmit="return confirm('Delete this clip?')">
+      <button class="btn danger small" type="submit">Delete clip</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-copy]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var cap = document.getElementById("caption").value.trim();
+    var tags = document.getElementById("hashtags").value.trim().split(/\s+/).filter(Boolean)
+      .map(function (t) { return "#" + t.replace(/^#/, ""); }).join(" ");
+    navigator.clipboard.writeText((cap + "\n\n" + tags).trim()).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy caption"; }, 1500);
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Add your first channel · Virlo Studio{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>Let's make your first clips</h1>
+  <p class="muted">Three quick steps. We scan the channel's latest streams and send the best moments to your library.</p>
+  <div class="card">{% with origin='onboarding' %}{% include "_channel_form.html" %}{% endwith %}</div>
+</div>
+{% endblock %}

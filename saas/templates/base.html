@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Virlo Studio{% endblock %}</title>
+<meta name="description" content="Paste your channel, get viral vertical clips. Virlo Studio watches your streams and edits the best moments for TikTok, Shorts and Reels.">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23b5ff3b'/><path d='M9 9l7 15 7-15' stroke='%23101014' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ '/app' if user else '/' }}"><span class="logo">V</span> Virlo Studio</a>
+  {% if user %}
+  <nav class="nav">
+    <a href="/app" class="{{ 'on' if request.url.path == '/app' }}">Home</a>
+    <a href="/app/clips" class="{{ 'on' if request.url.path.startswith('/app/clips') }}">Clips</a>
+    <a href="/app/channels" class="{{ 'on' if request.url.path.startswith('/app/channels') }}">Channels</a>
+    <a href="/app/activity" class="{{ 'on' if request.url.path.startswith('/app/activity') }}">Activity</a>
+    <a href="/app/account" class="{{ 'on' if request.url.path.startswith('/app/account') }}">Account</a>
+  </nav>
+  {% else %}
+  <nav class="nav">
+    <a href="/#pricing">Pricing</a>
+    <a href="/login">Log in</a>
+    <a href="/signup" class="btn small">Start free</a>
+  </nav>
+  {% endif %}
+</header>
+<main class="wrap">
+  {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+  {% if err %}<div class="flash bad">{{ err }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="foot">
+  <span>© Virlo Studio</span>
+  <a href="/terms">Terms &amp; takedowns</a>
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

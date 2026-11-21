@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Channels · Virlo Studio{% endblock %}
+{% block content %}
+<div class="row between"><h1>Channels</h1><span class="muted small">{{ channels | length }} / {{ usage.plan.channels }} on {{ usage.plan.label }}</span></div>
+{% for ch in channels %}
+<div class="card chanrow">
+  <div class="grow">
+    <b><a href="{{ channel_url(ch.platform, ch.channel) }}" target="_blank" rel="noopener">{{ ch.channel }}</a></b>
+    <span class="muted small">{{ ch.platform | title }} · added {{ ch.created_at | ago }} · {{ RIGHTS.get(ch.rights_basis, '') }}</span>
+    {% if ch.blocked %}<p class="flash bad small">This streamer asked not to be clipped. The channel is paused.</p>{% endif %}
+  </div>
+  <form method="post" action="/app/channels/{{ ch.id }}/style" class="inline">
+    <select name="style">{% for key, label in STYLES.items() %}<option value="{{ key }}" {{ 'selected' if ch.style == key }}>{{ label }}</option>{% endfor %}</select>
+    <label class="small muted" title="Higher = fewer, stronger clips">Picky
+      <input type="range" name="picky" min="4" max="9" step="0.5" value="{{ ch.picky_value }}" oninput="this.nextElementSibling.textContent=this.value"><span>{{ ch.picky_value }}</span>
+    </label>
+    <button class="btn ghost small">Save</button>
+  </form>
+  <div class="row gap">
+    <form method="post" action="/app/channels/{{ ch.id }}/toggle"><button class="btn ghost small">{{ 'Resume' if ch.paused else 'Pause' }}</button></form>
+    <form method="post" action="/app/channels/{{ ch.id }}/delete" onsubmit="return confirm('Remove {{ ch.channel }}?')"><button class="btn danger small">Remove</button></form>
+  </div>
+</div>
+{% endfor %}
+{% if channels | length < usage.plan.channels %}
+<h2>Add a channel</h2>
+<div class="card">{% with origin='channels' %}{% include "_channel_form.html" %}{% endwith %}</div>
+{% else %}
+<div class="card empty"><b>You've used all your channel slots.</b><p class="muted">Paid plans with more channels open soon.</p></div>
+{% endif %}
+{% endblock %}

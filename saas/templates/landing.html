@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">Built for clippers and streamers</p>
+  <h1>Paste a channel.<br><span class="hl">Get viral clips.</span></h1>
+  <p class="lead">Virlo Studio watches Twitch, Kick and YouTube streams, finds the moments chat lost it over, and
+    edits them into ready-to-post Shorts, Reels and TikToks: moving crop, facecam, captions and a hook.</p>
+  <div class="row gap">
+    <a class="btn big" href="{{ '/app' if user else '/signup' }}">{{ 'Open the app' if user else 'Start free: 10 clips a month' }}</a>
+    <a class="btn ghost big" href="#how">How it works</a>
+  </div>
+  <p class="muted small">No card. No install. Cancel any time.</p>
+</section>
+
+<section id="how" class="grid3">
+  <div class="card"><div class="num">1</div><h3>Paste a link</h3><p>Any Twitch, Kick or YouTube channel. Pick a style: Gaming, GTA 6, Podcast, Arabic or General.</p></div>
+  <div class="card"><div class="num">2</div><h3>We find the moments</h3><p>Chat spikes, YouTube's most-replayed parts, viewer clips and audio peaks. AI watches each one and keeps only real peaks.</p></div>
+  <div class="card"><div class="num">3</div><h3>Download and post</h3><p>Every clip comes with a hook, caption, hashtags and a posting slot. Paste the link after posting and we track the views.</p></div>
+</section>
+
+<section class="why card">
+  <h2>Why clippers switch</h2>
+  <ul class="ticks">
+    <li><b>Pay per clip, not per minute.</b> A 6-hour stream costs the same as a 10-minute one.</li>
+    <li><b>Made for streams.</b> We clip what chat and viewers already reacted to, not just what was said.</li>
+    <li><b>Looks hand-edited.</b> Crop follows the action, zoom on the punchline, word-by-word captions.</li>
+    <li><b>Learns your page.</b> Real view counts from your posts make the next clips better.</li>
+  </ul>
+</section>
+
+<section id="pricing">
+  <h2 class="center">Simple pricing</h2>
+  <div class="grid4">
+    {% for key, p in PLANS.items() %}
+    <div class="card plan {{ 'featured' if key == 'creator' }}">
+      <h3>{{ p.label }}</h3>
+      <div class="price">${{ p.price }}<span>/mo</span></div>
+      <ul class="ticks">
+        <li>{{ p.clips }} clips a month</li>
+        <li>{{ p.channels }} channel{{ 's' if p.channels > 1 }}</li>
+        {% if p.scorer != 'gemini' %}<li>Two-AI quality check</li>{% endif %}
+        {% if p.campaign_rules %}<li>Clipping-campaign rules</li>{% endif %}
+        {% if p.live %}<li>Live recording ({{ p.live }}), coming soon</li>{% endif %}
+        <li>{{ p.history_days }}-day clip history</li>
+      </ul>
+      <a class="btn {{ '' if key == 'creator' else 'ghost' }}" href="/signup">{{ 'Start free' if key == 'free' else 'Choose ' + p.label }}</a>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted small center">Paid plans open soon. Everyone starts on Free.</p>
+</section>
+{% endblock %}

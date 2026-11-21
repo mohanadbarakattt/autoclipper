@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Activity · Virlo Studio{% endblock %}
+{% block content %}
+<h1>Activity</h1>
+<p class="muted">Every moment the AI looked at, and why it kept or skipped it. Lots of skips is normal: most moments in a stream aren't viral. If good ones get skipped, lower the "Picky" slider on the channel.</p>
+
+<h2>Scans</h2>
+<div class="card table">
+  {% for j in jobs %}
+  <div class="tr">
+    <span class="tag {{ 'ready' if j.status == 'done' else ('rejected' if j.status == 'failed' else '') }}">{{ j.status | title }}</span>
+    <span>{{ (j.finished_at or j.started_at or j.created_at) | ago }}</span>
+    <span class="muted small grow">{% if j.status == 'failed' %}{{ (j.error or '')[:160] }}{% elif j.result %}{{ j.result }}{% endif %}</span>
+  </div>
+  {% else %}<p class="muted">No scans yet.</p>{% endfor %}
+</div>
+
+<h2>Moments</h2>
+<div class="card table">
+  {% for c in items %}
+  <a class="tr" href="/app/clips/{{ c.id }}">
+    <span class="tag {{ c.status }}">{{ c.label }}</span>
+    <span>{{ c.channel }}</span>
+    <span class="muted small grow">{{ c.trigger or '' }}{% if c.status in ('rejected', 'failed') and c.error %} · {{ c.error[:140] }}{% elif c.hook %} · “{{ c.hook }}”{% endif %}</span>
+    <span class="muted small">{{ c.created_at | ago }}</span>
+  </a>
+  {% else %}<p class="muted">Nothing yet. The first scan starts right after you add a channel.</p>{% endfor %}
+</div>
+{% endblock %}

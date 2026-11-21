@@ -24,7 +24,8 @@ RING_DIR = DATA_DIR / "ring_buffers"
 CANDIDATES_DIR = DATA_DIR / "candidates"
 READY_DIR = DATA_DIR / "ready_clips"
 WORK_DIR = DATA_DIR / "work"
-FONTS_DIR = ROOT / "assets" / "fonts"
+# shared fonts folder when several roots (e.g. hosted workspaces) use one install
+FONTS_DIR = Path(os.getenv("CLIPPER_FONTS_DIR") or ROOT / "assets" / "fonts")
 DB_PATH = STATE_DIR / "clipper.db"
 STREAMERS_FILE = CONFIG_DIR / "streamers.json"
 

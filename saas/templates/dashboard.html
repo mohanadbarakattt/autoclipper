@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="stats">
+  <div class="card stat">
+    <span class="muted small">Clips this month</span>
+    <div class="big-num">{{ usage.used }} <span class="muted">/ {{ usage.plan.clips }}</span></div>
+    <div class="bar"><div style="width: {{ usage.pct }}%"></div></div>
+    <span class="muted small">{{ usage.plan.label }} plan · {{ usage.left }} left</span>
+  </div>
+  <div class="card stat"><span class="muted small">Ready to post</span><div class="big-num">{{ counts.ready }}</div><a class="small" href="/app/clips?status=ready">Open</a></div>
+  <div class="card stat"><span class="muted small">Posted</span><div class="big-num">{{ counts.posted }}</div><a class="small" href="/app/clips?status=posted">Open</a></div>
+  <div class="card stat"><span class="muted small">Being checked</span><div class="big-num" id="working">{{ counts.working }}</div><a class="small" href="/app/activity">Activity</a></div>
+</section>
+
+<section class="card now">
+  <div>
+    {% if job and job.status == 'running' %}
+      <b><span class="dot live"></span> Scanning your channels now…</b>
+      <span class="muted small">Started {{ job.started_at | ago }}. Clips appear below as they finish.</span>
+    {% elif job and job.status == 'queued' %}
+      <b><span class="dot"></span> Scan queued</b><span class="muted small">It starts as soon as a worker is free.</span>
+    {% elif job and job.status == 'failed' %}
+      <b><span class="dot bad"></span> Last scan failed</b><span class="muted small">We'll try again on the next scan. Details in Activity.</span>
+    {% else %}
+      <b><span class="dot ok"></span> All caught up</b>
+      <span class="muted small">Last scan {{ user.last_scan_at | ago }} · next {{ next_scan | ago }}</span>
+    {% endif %}
+  </div>
+  <form method="post" action="/app/scan"><button class="btn ghost small">Scan now</button></form>
+</section>
+
+<section>
+  <div class="row between"><h2>Latest clips</h2><a href="/app/clips">See all</a></div>
+  {% if clips %}
+  <div class="clips">{% for c in clips %}{% include "_clip_card.html" %}{% endfor %}</div>
+  {% else %}
+  <div class="card empty">
+    <b>Your first clips are on the way.</b>
+    <p class="muted">We're looking at the channel's latest streams. Most first scans take 20-40 minutes. You can close this page; clips will be waiting here.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section>
+  <div class="row between"><h2>Channels</h2><a href="/app/channels">Manage</a></div>
+  <div class="chans">
+    {% for ch in channels %}
+    <div class="card chan">
+      <b>{{ ch.channel }}</b>
+      <span class="muted small">{{ ch.platform | title }} · {{ STYLES.get(ch.style, ch.style) }}</span>
+      {% if ch.blocked %}<span class="tag rejected">Opted out</span>
+      {% elif ch.paused %}<span class="tag">Paused</span>
+      {% elif ch.status.is_live %}<span class="tag live">Live: {{ ch.status.category or ch.status.title or '' }}</span>
+      {% else %}<span class="tag ready">Watching</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+// refresh the page when the clip count changes (no reload loop while nothing happens)
+(function () {
+  var last = null;
+  setInterval(function () {
+    fetch("/app/status", {credentials: "same-origin"}).then(function (r) { return r.json(); }).then(function (s) {
+      var key = JSON.stringify([s.job, s.counts]);
+      if (last !== null && key !== last) location.reload();
+      last = key;
+    }).catch(function () {});
+  }, 30000);
+})();
+</script>
+{% endblock %}

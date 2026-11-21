@@ -12,3 +12,9 @@ venv/
 config/profiles/campaign_*.json
 config/profiles/client_*.json
 config/profiles/lead_*.json
+
+# Virlo Studio (hosted SaaS): secrets, user data, local venv
+saas.env
+saas_data/
+.venv-saas/
+.pytest_cache/

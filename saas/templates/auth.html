@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Create your account' if mode == 'signup' else 'Log in' }} · Virlo Studio{% endblock %}
+{% block content %}
+<div class="narrow card">
+  {% if mode == 'signup' %}
+  <h1>Create your free account</h1>
+  <p class="muted">10 clips a month, free forever. No card.</p>
+  <form method="post" action="/signup" class="form">
+    <label>Email <input type="email" name="email" required autocomplete="email"></label>
+    <label>Password <input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <label class="check"><input type="checkbox" name="terms" required> I agree to the <a href="/terms" target="_blank">terms</a> and only clip streams I'm allowed to.</label>
+    <button class="btn big" type="submit">Create account</button>
+  </form>
+  <p class="muted small">Already have one? <a href="/login">Log in</a></p>
+  {% else %}
+  <h1>Welcome back</h1>
+  <form method="post" action="/login" class="form">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>Email <input type="email" name="email" required autocomplete="email"></label>
+    <label>Password <input type="password" name="password" required autocomplete="current-password"></label>
+    <button class="btn big" type="submit">Log in</button>
+  </form>
+  <p class="muted small">New here? <a href="/signup">Create a free account</a></p>
+  {% endif %}
+</div>
+{% endblock %}

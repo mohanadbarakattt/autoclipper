@@ -1,0 +1,11 @@
+<a class="clip" href="/app/clips/{{ c.id }}">
+  <div class="poster">
+    {% if c.done %}<img src="/app/clips/{{ c.id }}/thumb" alt="" loading="lazy">{% else %}<div class="ph">{{ c.label }}</div>{% endif %}
+    {% if c.viral_score %}<span class="score">{{ '%.1f' % c.viral_score }}</span>{% endif %}
+    <span class="tag {{ c.status }}">{{ c.label }}</span>
+  </div>
+  <div class="meta">
+    <b>{{ c.hook or c.title or 'Clip #' ~ c.id }}</b>
+    <span class="muted small">{{ c.channel }}{% if c.scheduled_at %} · {{ c.scheduled_at | when }}{% endif %}</span>
+  </div>
+</a>
