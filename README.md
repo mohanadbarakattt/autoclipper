@@ -2,16 +2,27 @@
   <img src="docs/images/banner.svg" alt="AutoClipper: livestreams in, viral vertical clips out" width="100%">
 </p>
 
+<h3 align="center">Livestreams in, money-ready Shorts out. On your own PC, for $0/month.</h3>
+
 <p align="center">
-  <b>Self-hosted, $0/month stream clipper.</b> It watches Twitch, Kick and YouTube streams, finds the moments
-  chat went crazy for, and turns them into ready-to-post Shorts, Reels and TikToks: captions, hook and all.<br>
-  Comes with a ready-made <b>GTA 6</b> preset.
+  <a href="https://github.com/mohanadbarakattt/autoclipper/stargazers"><img src="https://img.shields.io/github/stars/mohanadbarakattt/autoclipper?style=flat&color=f5c518" alt="Stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/cost-%240%2Fmonth-brightgreen" alt="$0/month">
+  <img src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20macOS%20%7C%20Linux-informational" alt="Windows, macOS, Linux">
 </p>
+
+<p align="center">
+  AutoClipper watches Twitch, Kick and YouTube streams, finds the moments chat went crazy for, and turns them
+  into ready-to-post Shorts, Reels and TikToks: captions, hook and all. Post them into paid clipping campaigns
+  and get paid per view. Comes with a ready-made <b>GTA 6</b> preset.
+</p>
+
+<p align="center"><b>⭐ If it saves you hours of editing, star the repo: it's how other clippers find it.</b></p>
 
 <p align="center">
   <a href="#-install-in-one-line">Install</a> ·
   <a href="#-how-it-works">How it works</a> ·
-  <a href="#-make-money-with-it-the-right-way">Make money</a> ·
+  <a href="#-get-paid-per-view">Get paid</a> ·
   <a href="#%EF%B8%8F-settings">Settings</a> ·
   <a href="#-faq">FAQ</a>
 </p>
@@ -104,9 +115,9 @@ It picks the layout for each clip automatically:
 | Whisper, FFmpeg, yt-dlp, streamlink | **$0**, open source, run on your PC |
 | Hardware | Any PC that can stay on. CPU-only is fine. Keep ~20 GB free. |
 
-## 💰 Make money with it, the right way
+## 💰 Get paid per view
 
-Reposting someone's stream without permission gets accounts struck. These ways pay and keep you safe:
+Three ways clippers get paid (reposting streams without permission gets accounts struck and payouts frozen, so skip that):
 
 1. **Paid clipping campaigns.** Streamers and brands pay clippers per view on marketplaces such as
    [Content Rewards](https://contentrewards.com). The typical rate is **about $1 per 1,000 views** (range $0.05–$3).
@@ -187,6 +198,7 @@ AutoClipper is free and open source. The best ways to help:
 - ⭐ **Star the repo** so other clippers can find it.
 - 🐛 **Report bugs** and share what worked in [Issues](https://github.com/mohanadbarakattt/autoclipper/issues).
 - 🔁 **Share it** with anyone who clips streams.
+- 🛠️ **Contribute** a preset or a fix: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 🧩 Project layout
 

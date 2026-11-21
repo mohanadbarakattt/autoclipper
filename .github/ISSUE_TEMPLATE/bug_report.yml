@@ -1,0 +1,29 @@
+name: Bug report
+description: Something broke or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Error / log lines
+      description: Paste the last lines from the AutoClipper window or the clip's reason in the dashboard. Remove any keys.
+      render: text
+  - type: input
+    id: os
+    attributes:
+      label: OS and install method
+      placeholder: Windows 11, one-line installer
+    validations:
+      required: true
+  - type: input
+    id: profile
+    attributes:
+      label: Profile used
+      placeholder: gta6

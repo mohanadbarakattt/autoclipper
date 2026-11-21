@@ -1,0 +1,14 @@
+name: Idea / feature request
+description: Something that would get you more or better clips
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should it do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter for your clips?
