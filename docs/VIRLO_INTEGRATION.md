@@ -32,10 +32,11 @@ that can run Whisper + FFmpeg (Oracle free VM at first), reachable at e.g. `http
   valid 6 h, issued by the service inside `/v1` responses.
 
 ## Points
-- `config/clips.json` in Virlo: `pointsPerClip: 20` at `sellPricePerCreditUsd 0.01` = $0.20 per clip;
-  service cost ≈ $0.03-0.06 per finished clip → ≥ 3.3x, inside Virlo's margin rule. A Vitest test enforces it.
-- Free tier (40 points/day) ≈ 2 clips a day; Creator (1,200/mo) ≈ 60 clips; Pro (3,500) ≈ 175; Studio
-  (10,000) ≈ 500.
+- `config/clips.json` in Virlo: `pointsPerClip: 15` at `sellPricePerCreditUsd 0.01` = $0.15 per clip, against
+  an all-in cost of ≤ $0.045 per finished clip → 3.3x, exactly Virlo's margin rule (a Vitest test enforces it;
+  keep `GEMINI_MEDIA_RESOLUTION=low` on the service to stay under that cost).
+- Free tier (15 points/day, capped at 200/month) = 1 clip a day; Creator (1,200/mo) = 80 clips; Pro (3,500)
+  ≈ 233; Studio (10,000) ≈ 666.
 - Only **finished** clips cost points. Rejected moments are free for the user (capped per month by tier inside
   the service so a dead channel can't burn AI spend).
 - **Allowance** before each run: `floor(balance / pointsPerClip)` (Virlo answers). The run stops at that many clips.
@@ -64,3 +65,15 @@ Errors: `{"error": code, "message": friendly English}`; Virlo maps codes to Egyp
 - `app/api/internal/clips/allowance` + `charge` (bearer check → ledger `getBalance` / `debit`).
 - `app/(studio)/studio/clips/**` pages + `components/StudioClips*.tsx`, nav link "كليباتي".
 - Env on Vercel: `CLIPS_SERVICE_URL`, `CLIPS_SERVICE_TOKEN`.
+
+## Status (2026-11-22)
+- Service side: `saas/api.py`, `saas/billing.py` on branch `saas` of this repo (30 Python tests).
+- Virlo side: commit `abb97ad` on branch `clips` of `virlo-studio` (local clone `C:\Users\user\virlo-studio`,
+  not pushed). Typecheck + lint clean, 9 new Vitest tests; the existing suite passes (two PGlite tests can time out
+  under full parallel load and pass alone, unrelated).
+- Checked end to end locally (Virlo dev in DEMO_MODE + service): sign up → Clips page → add channel (user
+  auto-registered, scan queued) → seeded finished clips → allowance 1 → first clip charged 15 points through the
+  real ledger, second locked (402) → video plays from a signed link; locked clip shows "top up".
+- Not yet done: a real stream clipped and rendered through the whole chain (needs paid Gemini/Anthropic keys and
+  the server), deploying the service (Oracle VM + Cloudflare Tunnel), setting `CLIPS_SERVICE_URL` /
+  `CLIPS_SERVICE_TOKEN` on Vercel, merging `clips` in virlo-studio.

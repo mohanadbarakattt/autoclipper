@@ -1,5 +1,11 @@
 # Virlo Studio: the hosted AutoClipper
 
+> **Update 2026-11-22: the clipper ships as a "Clips" tool inside the existing Virlo Studio app** (Next.js on
+> Vercel, its own accounts, points and Paymob/Paddle payments). This repo's `saas/` runs as the clipping service
+> behind it. Pricing is now **15 Virlo points per finished clip** instead of the separate $9/$19/$39 plans and
+> Polar below. Contract and status: [VIRLO_INTEGRATION.md](VIRLO_INTEGRATION.md). The standalone app still works
+> (`SAAS_MODE=app`) but isn't the launch path.
+
 Status: **draft v3 for approval** (competitors, edge and money plan: [COMPETITIVE_STRATEGY.md](COMPETITIVE_STRATEGY.md)) · branch `saas` · 2026-11-21 · website: **virlo.studio**
 
 Virlo Studio is AutoClipper as a website. It works exactly like our AutoClipper (same engine, same clips), with a
