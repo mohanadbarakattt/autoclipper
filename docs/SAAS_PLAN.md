@@ -20,7 +20,7 @@ Goals, in order:
 | Plans | Free forever + $9 / $19 / $39 (§5) |
 | Payments | Polar (lists Egypt as a payout country); Gumroad as fallback behind the same adapter |
 | Website | `virlo.studio` (landing + pricing), `app.virlo.studio` (the app) |
-| Hosting | one cheap server to start (§8); not a focus of this plan |
+| Hosting | **$0 to start**: Oracle Cloud Always Free + Cloudflare free + open-source tools; move to a paid server when paying users cover it (§8) |
 
 ## 2. The user's journey
 
@@ -111,7 +111,7 @@ rejects are free for users but capped behind the scenes so a dead channel can't 
 | Creator | $19 | $1.16 | $6.00 + live | 55% | 72% |
 | Pro | $39 | $1.96 | $15.00 + live | 45% | 66% |
 
-With a ~$40/month server, **5 Starter users cover the server**, and every 10 free users cost about $1.50-3 a
+On the free Oracle server hosting costs $0; on a ~$40/month server later, **5 Starter users cover it**, and every 10 free users cost about $1.50-3 a
 month, so one $19 Creator pays for ~60 free users. A global daily AI-spend limit protects against surprises.
 
 ## 6. Robustness
@@ -151,8 +151,43 @@ month, so one $19 Creator pays for ~60 free users. A global daily AI-spend limit
 - **Data**: SQLite for accounts (Postgres later if needed); each user's clip database is the engine's own.
 - **Auth**: email + password (stdlib `scrypt`), secure session cookie; Google sign-in later.
 - **Workers**: a scheduler picks users with work due and runs the engine; parallel runs = CPU cores / 4.
-- **Hosting**: one ~$40/month 8-vCPU server behind Cloudflare (free TLS) at launch; clips on Cloudflare R2
-  later. A GPU worker only once revenue covers it.
+- **Workers can run anywhere**: from M4 the worker pulls jobs from the app over HTTPS with a worker token, so
+  extra machines (your own PC, a second free VM, a rented GPU) can join without changing anything else.
+
+### Hosting options
+
+The heavy part is CPU work (Whisper speech-to-text + FFmpeg rendering, ~2 CPU-minutes per finished clip), so
+"free" options are judged on CPU and RAM, not just on whether a website fits.
+
+**Free (start here)**
+
+| Piece | Free option | Notes |
+|---|---|---|
+| Server | **Oracle Cloud Always Free**, Ampere A1 ARM VM: **2 OCPU / 12 GB RAM** (Oracle halved it from 4/24 in 2026), 200 GB disk | best free fit; handles roughly 300-500 clips/month. Needs a card to sign up (not charged). Oracle reclaims VMs idle under 20% for 7 days, which a clipper won't be. Everything we use runs on ARM. |
+| Deploys | **Coolify** or **Dokploy** (open-source, self-hosted Heroku/Vercel alternatives) on that VM | push-to-deploy from GitHub, HTTPS, logs, restarts, backups from a web panel |
+| HTTPS, domain, CDN | **Cloudflare free** (DNS for virlo.studio, proxy, TLS) + **Cloudflare Tunnel** (open-source `cloudflared`) | no open ports; the same tunnel works for a PC worker |
+| Clip storage | **Cloudflare R2 free** (10 GB, free downloads) or **Garage / SeaweedFS** (open-source S3) on the VM's disk | 10 GB ≈ 330 clips kept at once; the plans' history windows keep it under that at first |
+| Database | SQLite on the VM (Postgres in Docker when needed) | free, nightly backup to R2 |
+| Monitoring | **Uptime Kuma** (open source) | pings `/health`, alerts on Telegram/email |
+| Email | Brevo free (300/day) or Resend free (3,000/month) | verification + "clips ready" |
+| Extra free capacity | **your own PC as a second worker** through Cloudflare Tunnel | doubles capacity at $0 while the PC is on |
+
+Free options that don't fit and why: Google Cloud e2-micro (1 GB RAM, too small for Whisper), AWS free tier
+(now time-limited credits), Render / Railway / Fly.io free (sleep or 512 MB RAM), Hugging Face Spaces free CPU
+(sleeps, wiped disk, not meant for a commercial service), GitHub Actions / Colab / Kaggle (their terms forbid it).
+
+**Paid, when revenue covers it**
+
+| Option | ~Cost | When |
+|---|---|---|
+| Contabo VPS (6-8 vCPU, 12-24 GB) | $7-15/mo | cheapest step up; slower CPUs, fine as a worker |
+| Hetzner CPX41 / CCX23 (8 vCPU, 16-32 GB) | $30-45/mo | reliable main server, ~3,000 clips/month |
+| GPU by the hour (RunPod, Vast.ai) as a worker | $0.15-0.40/hr | only when the queue gets long; Whisper + NVENC ~10x faster |
+| Second Oracle free account? | - | against Oracle's terms (one free tier per person); don't |
+
+**Path**: launch on Oracle free + Cloudflare free (**$0/month**) → add your PC as a worker when the queue grows →
+move the main server to Hetzner once ~5 paying users cover it. Only AI usage costs money from day one (~$0.03-0.05
+per clip), and it scales with use.
 - **Secrets**: never in git (the repo is public). Paid Gemini key, Anthropic key, Polar keys, session secret live in
   `saas.env` (gitignored); `saas.env.example` is committed. User data lives in `saas_data/` (gitignored). Your local
   AutoClipper (`.env`, `data/`, `config/streamers.json`) is untouched.
