@@ -170,12 +170,13 @@ def main() -> None:
     check_claude()
     offer_autostart()
 
-    say(f"AutoClipper is running -> http://localhost:{PORT}   (close this window to stop it)")
+    port = env_get("DASHBOARD_PORT") or PORT
+    say(f"AutoClipper is running -> http://localhost:{port}   (close this window to stop it)")
     env = {**os.environ, "CLIPPER_ROOT": str(ROOT), "PYTHONIOENCODING": "utf-8", "HF_HUB_DISABLE_SYMLINKS_WARNING": "1"}
     proc = subprocess.Popen([str(PY), "-m", "clipper"], cwd=ROOT, env=env)
     time.sleep(6)
     if not os.environ.get("AUTOCLIPPER_NO_BROWSER"):
-        webbrowser.open(f"http://localhost:{PORT}")
+        webbrowser.open(f"http://localhost:{port}")
     try:
         proc.wait()
     except KeyboardInterrupt:
