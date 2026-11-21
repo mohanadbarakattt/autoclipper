@@ -28,7 +28,7 @@
 - 🎯 **Finds the moments**: chat spikes, YouTube's "Most Replayed" peaks, viewer-clip clusters and audio peaks. No AI is spent on dead air.
 - 🧠 **Two AI judges, both free**: Gemini watches the clip; Claude (your existing plan, optional) gives the final word.
 - 🎬 **Edits like a human**: 9:16 crop that **follows the action**, webcam stacked on top, a **zoom on the punchline**, word-by-word karaoke captions and a 3.5 s hook banner.
-- 📅 **Posting schedule**: 3 peak-time slots a day, with every clip + caption file copied to your **Google Drive**.
+- 📅 **Posting schedule**: up to 6 posts a day by default (set any number), **best clips first** so a great moment never waits behind weak ones, with every clip + caption file copied to your **Google Drive**.
 - 📈 **Learns from your views**: paste the link after posting, and it tracks views and scores future clips like your best ones.
 - 🔎 **Finds streams for you**: picks up the biggest live streams in your niche every hour.
 - 🧹 **No duplicates**, no full-VOD downloads, cleans up after itself.
@@ -84,7 +84,7 @@ Requires Python 3.10+ and FFmpeg on your PATH.
 <img src="docs/images/dashboard.png" alt="AutoClipper dashboard: streamers being recorded, posting schedule, clip pipeline" width="100%">
 
 - **Streamers**: who is live, what's being recorded, chat speed. Add, pause or remove channels.
-- **Posting schedule**: each finished clip gets a slot (your local time is shown too). **Download**, **Copy caption**, then **Mark posted** and paste the post link so it can track views.
+- **Posting schedule**: each finished clip gets a slot, best clips first (your local time is shown too). **Download**, **Copy caption**, then **Mark posted** and paste the post link so it can track views.
 - **Clip pipeline**: every candidate and why it passed or got rejected.
 
 ## 🔍 How it works
@@ -132,7 +132,9 @@ Copy one to start a new niche; any key you leave out uses the default in `clippe
 | `layout_mode` | `auto`, `stacked_facecam`, `speaker_crop`, `blur_fit` |
 | `clip_duration` | Min/max seconds (shorter = better completion rate) |
 | `min_viral_score` | Score gate (1–10). Lower it if almost nothing passes. |
-| `posting_times`, `posting_timezone` | Daily posting slots (default 12:00 / 17:00 / 21:00 New York) |
+| `max_posts_per_day` | Posts per day (presets: 6). Extra slots beyond `posting_times` are spread across `posting_window` |
+| `posting_times`, `posting_window`, `posting_timezone` | Peak slots (default 12:00 / 17:00 / 21:00 New York) and the window for extra slots (`11:00-23:30`) |
+| `max_queue_hours` | Keeps the queue fresh (default 48): once it's full, a clearly better clip takes the weakest waiting clip's slot |
 | `whisper_model` | `large-v3-turbo` (default, accurate) or `small` (faster on slow PCs) |
 | `language` | `en`, `ar`, … or leave empty to auto-detect |
 | `follow_action`, `payoff_zoom` | Moving crop and punchline zoom on/off |

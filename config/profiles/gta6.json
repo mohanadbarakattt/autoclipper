@@ -8,7 +8,7 @@
     "max": 40
   },
   "min_viral_score": 6.0,
-  "max_posts_per_day": 3,
+  "max_posts_per_day": 6,
   "post_spacing_hours": 4,
   "heatmap_threshold": 0.75,
   "max_vod_windows": 8,

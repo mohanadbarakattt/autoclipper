@@ -59,19 +59,46 @@ class TryPost:
         return r.json().get("posts", [])
 
 
-def next_slot(profile: dict) -> datetime:
-    """Next free posting time (UTC). Uses the profile's fixed daily `posting_times` in `posting_timezone`
+def _mins(hhmm: str) -> int:
+    hh, mm = (int(x) for x in hhmm.strip().split(":"))
+    return hh * 60 + mm
+
+
+def daily_times(profile: dict) -> list[str]:
+    """The day's posting slots. Fixed `posting_times` are kept; if `max_posts_per_day` asks for more, extra
+    slots are spread as far apart as possible inside `posting_window` (e.g. "11:00-23:30")."""
+    n = max(1, int(profile.get("max_posts_per_day") or 3))
+    fixed = sorted({t.strip() for t in (profile.get("posting_times") or []) if t.strip()}, key=_mins)
+    if len(fixed) >= n:
+        return fixed[:n]
+    start, end = (profile.get("posting_window") or "11:00-23:30").split("-")
+    s, e = _mins(start), _mins(end)
+    if e <= s:
+        e += 24 * 60  # window past midnight, e.g. 18:00-02:00
+    if not fixed:  # no peak times given: spread evenly over the window
+        step = (e - s) / max(n - 1, 1)
+        return [f"{(m // 60) % 24:02d}:{m % 60:02d}" for m in (int(round((s + i * step) / 5) * 5) for i in range(n))]
+    chosen = [m if m >= s else m + 24 * 60 for m in map(_mins, fixed)]
+    grid = range(s, e + 1, 15)
+    while len(chosen) < n:
+        best = max(grid, key=lambda m: min((abs(m - c) for c in chosen), default=10 ** 6) - (m - s) / 10 ** 4)
+        if best in chosen:
+            break
+        chosen.append(best)
+    return [f"{(m // 60) % 24:02d}:{m % 60:02d}" for m in sorted(chosen)]
+
+
+def next_slot(profile: dict, ignore_id: int | None = None) -> datetime:
+    """Next free posting time (UTC), from `daily_times` in `posting_timezone`
     (one shared queue across all profiles, since they usually post to the same accounts)."""
     from zoneinfo import ZoneInfo
     tz = ZoneInfo(profile.get("posting_timezone") or "America/New_York")
-    times = sorted(profile.get("posting_times") or [])[: int(profile["max_posts_per_day"])]
+    times = daily_times(profile)
     earliest = datetime.now(timezone.utc) + timedelta(minutes=20)
     taken = [datetime.fromisoformat(r["scheduled_at"]) for r in
-             db.q("SELECT scheduled_at FROM candidates WHERE scheduled_at IS NOT NULL AND status NOT IN ('rejected','failed')")]
+             db.q("SELECT scheduled_at FROM candidates WHERE scheduled_at IS NOT NULL AND status NOT IN ('rejected','failed')"
+                  " AND id != ?", (ignore_id or -1,))]
     taken = [t if t.tzinfo else t.replace(tzinfo=timezone.utc) for t in taken]
-    if not times:  # fallback: fixed spacing
-        spacing = timedelta(hours=float(profile["post_spacing_hours"]))
-        return max([earliest] + [t + spacing for t in taken]).replace(microsecond=0)
     day = earliest.astimezone(tz).date()
     for d in range(90):
         date = day + timedelta(days=d)
@@ -83,12 +110,35 @@ def next_slot(profile: dict) -> datetime:
     return earliest
 
 
+def claim_slot(cand: dict, profile: dict) -> tuple[datetime, int | None]:
+    """Slot for a manually posted clip. If the queue is already full for `max_queue_hours`, a better clip takes
+    the slot of the weakest clip still waiting in that window (returned as the second value, to be re-queued)."""
+    slot = next_slot(profile, ignore_id=cand.get("id"))
+    hours = float(profile.get("max_queue_hours") or 0)
+    now = datetime.now(timezone.utc)
+    if not hours or slot <= now + timedelta(hours=hours):
+        return slot, None
+    waiting = []
+    for r in db.q("SELECT id, viral_score, scheduled_at FROM candidates WHERE status='ready' AND scheduled_at IS NOT NULL"
+                  " AND id != ?", (cand.get("id") or -1,)):
+        at = datetime.fromisoformat(r["scheduled_at"])
+        at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        if now + timedelta(minutes=20) <= at <= now + timedelta(hours=hours):
+            waiting.append((r["viral_score"] or 0, at.timestamp(), r["id"], at))  # weakest, then soonest
+    if waiting:
+        score, _, weak_id, at = min(waiting)
+        if (cand.get("viral_score") or 0) >= score + 0.5:  # clearly better only, so the schedule doesn't churn
+            return at, weak_id
+    return slot, None
+
+
 def publish(cand: dict, profile: dict) -> dict:
     tp = TryPost()
     pub = profile["publish"]
     if pub.get("mode") == "off" or not tp.configured:
-        # manual posting: still give every clip its own slot in the schedule
-        return {"status": "ready", "scheduled_at": next_slot(profile).isoformat()}
+        # manual posting: still give every clip its own slot in the schedule (best clips first)
+        slot, bumped = claim_slot(cand, profile)
+        return {"status": "ready", "scheduled_at": slot.isoformat(), "bumped": bumped}
     accts = [a for a in tp.accounts() if a.get("status") == "connected" and a.get("platform") in CONTENT_TYPES]
     if pub.get("account_ids"):
         accts = [a for a in accts if a["id"] in pub["account_ids"]]

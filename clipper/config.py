@@ -44,8 +44,11 @@ DEFAULT_PROFILE: dict = {
     "min_viral_score": 7.5,
     "max_posts_per_day": 6,
     "post_spacing_hours": 3,
-    # fixed daily posting slots (peak US short-form times by default)
+    # peak daily posting times; if max_posts_per_day is higher, extra slots are spread across posting_window
     "posting_times": ["12:00", "17:00", "21:00"],
+    "posting_window": "11:00-23:30",
+    # keep the queue fresh: once it's full this many hours ahead, a better clip takes the weakest waiting clip's slot
+    "max_queue_hours": 48,
     "posting_timezone": "America/New_York",
     "cooldown_sec": 180,
     "window_before_sec": 60,

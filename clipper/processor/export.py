@@ -26,6 +26,30 @@ def _safe(name: str) -> str:
     return name[:70] or "clip"
 
 
+def _place(root: str, c: dict):
+    """(folder, file base name, show time, local time) of a clip's export, from its posting slot."""
+    when = datetime.fromisoformat(c["scheduled_at"]) if c.get("scheduled_at") else datetime.now(timezone.utc)
+    when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+    show, local = when.astimezone(ZoneInfo(SHOW_TZ)), (when.astimezone(ZoneInfo(LOCAL_TZ)) if LOCAL_TZ else when.astimezone())
+    from ..config import load_profile
+    raw_sub = (load_profile(c["profile"]).get("export_subdir") or "").strip() if c.get("profile") else ""
+    sub = _safe(raw_sub) if raw_sub else ""
+    folder = (Path(root) / sub if sub else Path(root)) / show.strftime("%Y-%m-%d")  # e.g. one folder per client
+    name = c.get("title") or c.get("hook") or f"clip {c['id']}"
+    base = f"{show:%H%M} {show.tzname()} - {_safe(name)}"
+    return folder, base, show, local
+
+
+def unexport(c: dict) -> None:
+    """Remove a clip's exported video + caption file (before it moves to another posting slot)."""
+    root = os.getenv("EXPORT_DIR", "").strip()
+    if not root or not c.get("scheduled_at") or not Path(root).anchor or not Path(Path(root).anchor).exists():
+        return
+    folder, base, _, _ = _place(root, c)
+    for ext in (".mp4", ".txt"):
+        (folder / f"{base}{ext}").unlink(missing_ok=True)
+
+
 def export_clip(cid: int) -> Path | None:
     root = os.getenv("EXPORT_DIR", "").strip()
     if not root or not Path(root).anchor or not Path(Path(root).anchor).exists():
@@ -34,15 +58,8 @@ def export_clip(cid: int) -> Path | None:
     if not c.get("out_path") or not Path(c["out_path"]).exists():
         return None
     score = json.loads(c["score_json"] or "{}")
-    when = datetime.fromisoformat(c["scheduled_at"]) if c.get("scheduled_at") else datetime.now(timezone.utc)
-    when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
-    show, local = when.astimezone(ZoneInfo(SHOW_TZ)), (when.astimezone(ZoneInfo(LOCAL_TZ)) if LOCAL_TZ else when.astimezone())
-    from ..config import load_profile
-    raw_sub = (load_profile(c["profile"]).get("export_subdir") or "").strip() if c.get("profile") else ""
-    sub = _safe(raw_sub) if raw_sub else ""
-    folder = (Path(root) / sub if sub else Path(root)) / show.strftime("%Y-%m-%d")  # e.g. one folder per client
+    folder, base, show, local = _place(root, c)
     folder.mkdir(parents=True, exist_ok=True)
-    base = f"{show:%H%M} {show.tzname()} - {_safe(c.get('title') or c.get('hook') or f'clip {cid}')}"
     dest = folder / f"{base}.mp4"
     if dest.exists() and dest.stat().st_size == Path(c["out_path"]).stat().st_size:
         return dest

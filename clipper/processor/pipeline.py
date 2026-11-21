@@ -128,8 +128,22 @@ def publish_candidate(cid: int) -> None:
     cand = {**cand, "hashtags": score.get("hashtags", [])}
     try:
         res = publish.publish(cand, profile)
+        bumped = res.get("bumped") and db.q("SELECT * FROM candidates WHERE id=?", (res["bumped"],))
+        if bumped:  # a better clip took this one's slot: move it to the back of the queue
+            export.unexport(bumped[0])
+            db.update_candidate(bumped[0]["id"], scheduled_at=None)
         db.update_candidate(cid, status=res["status"], trypost_post_ids=res.get("post_ids"),
                             scheduled_at=res.get("scheduled_at"), error=res.get("note"))
+        if bumped:
+            b = bumped[0]
+            new_at = publish.next_slot(load_profile(b["profile"]), ignore_id=b["id"]).isoformat()
+            db.update_candidate(b["id"], scheduled_at=new_at)
+            log.info("clip %s (score %s) took the slot of clip %s, which moves to %s", cid, cand.get("viral_score"),
+                     b["id"], new_at)
+            try:
+                export.export_clip(b["id"])
+            except Exception:
+                log.exception("re-export failed for %s", b["id"])
     except Exception as e:
         log.exception("publish failed for %s", cid)
         db.update_candidate(cid, status="publish_failed", error=str(e)[:1000])
