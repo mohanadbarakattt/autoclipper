@@ -180,12 +180,11 @@ model and retries, so you don't need to do anything.
 
 ## ❤️ Support the project
 
-AutoClipper is free and open source. If it makes you money, consider supporting it:
+AutoClipper is free and open source. The best ways to help:
 
-<!-- TODO before going public: replace with real links / addresses -->
-- **Sponsor:** _Polar link coming soon_
-- **Crypto:** _addresses coming soon_
-- **Hosted version** (no PC needed): _waitlist coming soon_
+- ⭐ **Star the repo** so other clippers can find it.
+- 🐛 **Report bugs** and share what worked in [Issues](https://github.com/mohanadbarakattt/autoclipper/issues).
+- 🔁 **Share it** with anyone who clips streams.
 
 ## 🧩 Project layout
 
