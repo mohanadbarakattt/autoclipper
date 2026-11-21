@@ -134,4 +134,7 @@ def matches_filter(info: dict, profile: dict) -> bool:
         return True  # no metadata available (no API keys) -> don't block
     # trust the platform's game category when there is one; titles often mention games they aren't playing
     hay = (info.get("category") or info.get("title") or "").lower()
+    if "youtube" in (info.get("url") or ""):
+        # YouTube categories are generic ("Gaming", "Entertainment"): the game is only in the title
+        hay = f"{info.get('category', '')} {info.get('title', '')}".lower()
     return any(part.strip() and part.strip() in hay for part in f.split("|"))
