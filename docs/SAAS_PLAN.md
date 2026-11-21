@@ -1,6 +1,6 @@
 # Virlo Studio: the hosted AutoClipper
 
-Status: **draft v2 for approval** · branch `saas` · 2026-11-21 · website: **virlo.studio**
+Status: **draft v3 for approval** (competitors, edge and money plan: [COMPETITIVE_STRATEGY.md](COMPETITIVE_STRATEGY.md)) · branch `saas` · 2026-11-21 · website: **virlo.studio**
 
 Virlo Studio is AutoClipper as a website. It works exactly like our AutoClipper (same engine, same clips), with a
 proper user interface on top: sign up, paste a channel, get ready-to-post vertical clips. Nothing to install, no
@@ -11,6 +11,8 @@ Goals, in order:
 2. **Great UI and functionality**: simple enough for a streamer who has never edited a clip.
 3. **Cheap to use, generous free plan**, priced so every plan, free included, pays for itself.
 4. **Robust and sustainable**: fails safely, can't run up an AI bill, cheap to keep running.
+5. **Built to earn**: campaigns, earnings tracking and a payback meter, so users see the money their clips make.
+   Target: **$2,500/month** for you (~210 paying users); everything above runs the service.
 
 ## 1. Decisions
 
@@ -49,6 +51,9 @@ Goals, in order:
 | **Channel style** (per channel) | caption font / size / colour / words per line with live preview, hook banner on/off, layout (auto / facecam stacked / speaker crop / blur), clip length, a **"Picky ↔ More clips"** slider (maps to `min_viral_score`), language; paid: campaign rules, required hashtags, caption suffix |
 | **Activity** | every moment the AI looked at, with the verdict and reason ("rejected: ordinary driving, no reaction"), so users trust it and tune the slider |
 | **Discover** (Creator+) | "find top live streams in my niche" (the engine's auto-discover) with one-click add |
+| **Earn Hub** | campaign board (CPM, cap, rules, niche) with **Clip for this campaign**; earnings per clip / campaign / month from tracked views × CPM; **payback meter** ("Virlo cost $9, your clips earned ~$86"); submission checklist per clip |
+| **Hook lab** (in clip detail) | 3 hook variants per clip, pick or post several; winners feed the learning loop |
+| **Squad** | friends share a niche, moments are split so nobody posts the same clip; leaderboard, streaks |
 | **Account & billing** | plan, usage this period, upgrade / downgrade (Polar checkout), invoices (Polar customer portal), delete account |
 | **Admin** (us) | users, plans, clips and AI spend per day, failed jobs + retry, opt-out list, takedown notices |
 
@@ -200,8 +205,11 @@ per clip), and it scales with use.
 | M2 | Plans + payments | Free/Starter/Creator/Pro limits enforced; Polar checkout + webhook; usage bar; watermark on free |
 | M3 | Schedule + style editor | week view, slot editing, caption style live preview, re-render with new hook |
 | M4 | Launch | landing page + pricing on virlo.studio, terms/privacy/takedown pages, server live, R2, backups, admin page |
-| M5 | Live + Discover | live recording for Creator/Pro, discover screen |
-| M6 | Growth | Google sign-in, notifications, referral codes, Arabic UI, verified-owner badge, auto-posting |
+| M5 | **Earn Hub** | campaign board (curated), one-click campaign setup, earnings tracker, payback meter |
+| M6 | Live + speed | live recording for Creator/Pro, push alerts "clip ready" minutes after a moment, stream radar (Discover + Virlo trends) |
+| M7 | Algorithm tools | hook lab, per-account originality pass, best-time posting per account, retention check |
+| M8 | Growth | squads, streaks/leaderboards, referrals, Clipper Playbook, Google sign-in, Arabic UI, auto-posting |
+| M9 | Virlo Campaigns | streamers/brands fund campaigns inside Virlo, we take 10-20% |
 
 ## 10. Open questions
 
