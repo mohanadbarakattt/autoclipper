@@ -3,15 +3,62 @@
   "niche_description": "GTA 6 (Grand Theft Auto VI) stream moments: chaos, glitches, easter eggs, funny reactions",
   "game_or_topic_filter": "Grand Theft Auto VI|GTA 6|GTA VI|GTA6",
   "layout_mode": "stacked_facecam",
-  "clip_duration": { "min": 18, "max": 40 },
-  "min_viral_score": 7.0,
+  "clip_duration": {
+    "min": 18,
+    "max": 40
+  },
+  "min_viral_score": 6.0,
   "max_posts_per_day": 3,
   "post_spacing_hours": 4,
   "heatmap_threshold": 0.75,
   "max_vod_windows": 8,
   "language": "en",
-  "emote_weights": { "KEKW": 3.0, "OMEGALUL": 3.0, "LUL": 2.0, "W": 2.5, "CLIP IT": 4.0, "NO WAY": 3.0, "ICANT": 3.0 },
-  "topic_keywords": ["lucia", "jason", "vice city", "leonida", "6 stars", "glitch", "easter egg", "wanted"],
-  "caption_style": { "words_per_line": 2, "font_size": 96 },
-  "publish": { "mode": "scheduled", "tiktok_privacy": "SELF_ONLY" }
+  "emote_weights": {
+    "KEKW": 3.0,
+    "OMEGALUL": 3.0,
+    "LUL": 2.0,
+    "W": 2.5,
+    "CLIP IT": 4.0,
+    "NO WAY": 3.0,
+    "ICANT": 3.0,
+    "LMAO": 2.0,
+    "LOL": 1.5,
+    "WHAT": 1.0,
+    "face_with_tears_of_joy": 2.5,
+    "rolling_on_the_floor_laughing": 2.5,
+    "skull": 2.5,
+    "loudly_crying_face": 1.5,
+    "fire": 1.0,
+    "exploding_head": 2.0,
+    "flushed_face": 1.5
+  },
+  "topic_keywords": [
+    "lucia",
+    "jason",
+    "vice city",
+    "leonida",
+    "6 stars",
+    "glitch",
+    "easter egg",
+    "wanted"
+  ],
+  "caption_style": {
+    "words_per_line": 2,
+    "font_size": 96
+  },
+  "publish": {
+    "mode": "scheduled",
+    "tiktok_privacy": "SELF_ONLY"
+  },
+  "auto_discover": {
+    "enabled": true,
+    "twitch_game": "Grand Theft Auto VI",
+    "kick_category": "Grand Theft Auto VI",
+    "youtube_query": "GTA 6",
+    "top_n": 3,
+    "min_viewers": 3000
+  },
+  "follow_action": true,
+  "payoff_zoom": true,
+  "whisper_model": "large-v3-turbo"
 }

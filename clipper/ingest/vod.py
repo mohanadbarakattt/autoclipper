@@ -18,7 +18,7 @@ from . import platforms
 
 log = logging.getLogger("vod")
 
-MAX_VOD_HOURS = 8
+MAX_VOD_HOURS = 30  # only peak sections are downloaded, so long streams are fine
 LOOKBACK = 3  # newest N VODs per channel
 
 
@@ -75,6 +75,68 @@ def twitch_clip_windows(s: dict, info: dict, profile: dict) -> list[tuple[float,
     return _merge(wins, info.get("duration") or 0, d["min"], d["max"])
 
 
+def chat_replay_windows(url: str, key: str, profile: dict, duration: float) -> list[tuple[float, float, float]]:
+    """YouTube keeps the full live chat with video timestamps: score it in 10 s buckets with the same
+    reaction scoring as live (spam damped) and return the biggest spikes vs. the local baseline."""
+    import json
+
+    import numpy as np
+
+    from ..media import YTDLP, run
+    from .spikes import score_message
+
+    tmp = WORK_DIR / f"chat_{key.replace(':', '_')}"
+    tmp.mkdir(parents=True, exist_ok=True)
+    try:
+        run([*YTDLP, "--no-warnings", "--skip-download", "--write-subs", "--sub-langs", "live_chat",
+             "-o", str(tmp / "c"), url], timeout=3600, check=False)
+        files = list(tmp.glob("c*.live_chat.json"))
+        if not files:
+            return []
+        bucket = 10
+        scores = np.zeros(int(duration // bucket) + 2)
+        seen: dict[int, dict[str, int]] = {}
+        with open(files[0], encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    a = json.loads(line)["replayChatItemAction"]
+                    t = int(a["videoOffsetTimeMsec"]) / 1000
+                    r = a["actions"][0]["addChatItemAction"]["item"]["liveChatTextMessageRenderer"]
+                except (KeyError, ValueError, IndexError, json.JSONDecodeError):
+                    continue
+                text = "".join(x.get("text") or ((x.get("emoji") or {}).get("shortcuts") or [""])[0]
+                               for x in r.get("message", {}).get("runs", []))
+                b = int(t // bucket)
+                if b >= len(scores):
+                    continue
+                k = text.lower().strip()[:60]
+                n = seen.setdefault(b, {}).get(k, 0) + 1
+                seen[b][k] = n
+                scores[b] += score_message(text, profile) * (0.05 if n > 2 else 1.0)
+        if scores.sum() == 0:
+            return []
+        # a peak must be in the stream's top 2% of buckets AND well above the surrounding 10 minutes
+        floor = float(np.percentile(scores[scores > 0], 98))
+        half = 30
+        ratio = np.zeros_like(scores)
+        for i in range(len(scores)):
+            if scores[i] >= floor:
+                ratio[i] = scores[i] / (np.median(scores[max(0, i - half): i + half]) + 1)
+        d = profile["clip_duration"]
+        picks: list[tuple[float, float, float]] = []
+        for i in np.argsort(ratio)[::-1]:
+            if len(picks) >= profile["max_vod_windows"] or ratio[i] < 3:
+                break
+            peak = i * bucket - 8  # chat reacts a few seconds after the moment
+            if any(abs(peak - (s + 50)) < 120 for s, _, _ in picks):
+                continue
+            start = float(max(0, peak - 50))  # keep the setup
+            picks.append((start, min(duration, start + d["max"] + 30), float(ratio[i])))
+        return picks
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def audio_windows(url: str, key: str, profile: dict) -> list[tuple[float, float, float]]:
     tmp = WORK_DIR / f"aud_{key.replace(':', '_')}"
     tmp.mkdir(parents=True, exist_ok=True)
@@ -115,6 +177,9 @@ def process_vod(s: dict, entry: dict) -> None:
     wins, method = [], ""
     if s["platform"] == "youtube":
         wins, method = heatmap_windows(info, profile), "replay heatmap"
+        if not wins and info.get("was_live") or info.get("live_status") == "was_live":
+            if not wins:
+                wins, method = chat_replay_windows(url, key, profile, info.get("duration") or 0), "chat replay spike"
         age_h = (time.time() - (info.get("timestamp") or info.get("release_timestamp") or time.time())) / 3600
         if not wins and age_h < 48:
             log.info("%s has no heatmap yet - retry later", key)

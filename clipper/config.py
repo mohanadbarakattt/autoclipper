@@ -51,12 +51,12 @@ DEFAULT_PROFILE: dict = {
     "window_before_sec": 60,
     "window_after_sec": 30,
     "spike_multiplier": 3.0,
-    "min_window_score": 25,
+    "min_window_score": 40,
     "emote_weights": {},
     "topic_keywords": [],
     "heatmap_threshold": 0.85,
     "max_vod_windows": 6,
-    "whisper_model": "small",
+    "whisper_model": "large-v3-turbo",  # best accuracy/speed on CPU; "small" for slow PCs
     "language": None,
     "caption_style": {
         "font": "Anton",

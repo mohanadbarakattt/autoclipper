@@ -9,7 +9,7 @@ from pathlib import Path
 from .. import db
 from ..config import READY_DIR, WORK_DIR, load_profile
 from ..media import cut, make_proxy, probe
-from . import ai, export, publish, render
+from . import ai, export, learn, publish, render
 
 log = logging.getLogger("pipeline")
 
@@ -40,6 +40,11 @@ def process(cand: dict) -> None:
         if not raw.exists():
             raise FileNotFoundError(f"raw clip missing: {raw}")
         dur = probe(raw)["duration"]
+        if dur < 5 or raw.stat().st_size / max(dur, 1) < 60_000:
+            # < ~0.5 Mbit/s for a 1080p stream = frozen frame, ad break or "offline" screen
+            db.update_candidate(cid, status="rejected", error="footage looks frozen/offline (skipped before AI)")
+            raw.unlink(missing_ok=True)
+            return
 
         # 1. Gemini looks at a cheap 480p/1fps proxy
         proxy = make_proxy(raw, work / "proxy.mp4")
@@ -57,10 +62,11 @@ def process(cand: dict) -> None:
         clip = cut(raw, work / "clip.mp4", start, end - start)
         words, transcript = render.transcribe(clip, profile.get("whisper_model", "small"), profile.get("language"))
 
-        # 3. Claude (subscription) scores + writes the hook
+        # 3. Gemini scores everything; Claude gives the final word on clips that pass
         db.update_candidate(cid, status="rendering")
         streamer = cand["streamer_id"].split(":", 1)[-1]
-        score, scorer = ai.score_clip(transcript, verdict, profile, cand["platform"], streamer)
+        examples = learn.performance_examples(profile["_file"])
+        score, scorer = ai.score_clip(transcript, verdict, profile, cand["platform"], streamer, examples)
         score["scorer"] = scorer
         score["transcript"] = transcript
         db.update_candidate(cid, score_json=score, viral_score=score["viral_score"], hook=score["top_banner_hook"],
@@ -71,13 +77,30 @@ def process(cand: dict) -> None:
             raw.unlink(missing_ok=True)
             return
 
-        # 4. render vertical
+        # 4. same moment already kept? keep only the better one
+        dup = learn.find_duplicate(cid, transcript, verdict.get("summary", ""), cand.get("source_ref") or "",
+                                   float(cand.get("source_offset") or 0) + start)
+        if dup:
+            if dup["status"] == "posted" or (dup["viral_score"] or 0) >= score["viral_score"]:
+                db.update_candidate(cid, status="rejected", error=f"duplicate of clip #{dup['id']} (kept that one)")
+                raw.unlink(missing_ok=True)
+                return
+            db.update_candidate(dup["id"], status="rejected", scheduled_at=None,
+                                error=f"duplicate - replaced by better clip #{cid}")
+            log.info("clip %s replaces duplicate %s", cid, dup["id"])
+
+        # 5. render vertical (shift Gemini's timings from the raw excerpt to the trimmed clip)
+        rv = dict(verdict)
+        rv["action_track"] = [{"t": float(p["t"]) - start, "x": p["x"]} for p in verdict.get("action_track") or []
+                              if isinstance(p, dict) and "t" in p and "x" in p]
+        if verdict.get("payoff_sec") is not None:
+            rv["payoff_sec"] = float(verdict["payoff_sec"]) - start
         out = READY_DIR / f"clip_{cid}.mp4"
-        render.render_vertical(clip, out, work, words, score["top_banner_hook"], verdict, profile)
+        render.render_vertical(clip, out, work, words, score["top_banner_hook"], rv, profile)
         db.update_candidate(cid, status="ready", out_path=str(out))
         raw.unlink(missing_ok=True)
 
-        # 5. TryPost
+        # 6. TryPost / schedule
         publish_candidate(cid)
     except Exception as e:
         log.exception("candidate %s failed", cid)

@@ -130,7 +130,8 @@ def matches_filter(info: dict, profile: dict) -> bool:
     f = (profile.get("game_or_topic_filter") or "").lower().strip()
     if not f:
         return True
-    hay = f"{info.get('category', '')} {info.get('title', '')}".lower()
     if not info.get("category") and not info.get("title"):
         return True  # no metadata available (no API keys) -> don't block
+    # trust the platform's game category when there is one; titles often mention games they aren't playing
+    hay = (info.get("category") or info.get("title") or "").lower()
     return any(part.strip() and part.strip() in hay for part in f.split("|"))

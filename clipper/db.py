@@ -49,6 +49,11 @@ def conn() -> sqlite3.Connection:
             _conn.row_factory = sqlite3.Row
             _conn.execute("PRAGMA journal_mode=WAL")
             _conn.executescript(SCHEMA)
+            have = {r[1] for r in _conn.execute("PRAGMA table_info(candidates)")}
+            for col, typ in (("post_url", "TEXT"), ("posted_at", "REAL"), ("views", "INTEGER"),
+                             ("views_checked_at", "REAL")):
+                if col not in have:  # upgrade older databases in place
+                    _conn.execute(f"ALTER TABLE candidates ADD COLUMN {col} {typ}")
             # anything stuck mid-processing after a crash goes back to the queue
             _conn.execute("UPDATE candidates SET status='pending' WHERE status IN ('analyzing','rendering')")
             _conn.commit()
@@ -88,7 +93,7 @@ def add_candidate(streamer: dict, source_type: str, source_ref: str, raw_path: s
         "INSERT INTO candidates (streamer_id, platform, profile, source_type, source_ref, source_offset,"
         " trigger, raw_path, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?, 'pending', ?, ?)",
         (streamer["id"], streamer["platform"], streamer["profile"], source_type, source_ref,
-         source_offset, trigger, raw_path, now, now),
+         float(source_offset or 0), trigger, raw_path, now, now),
     )
 
 

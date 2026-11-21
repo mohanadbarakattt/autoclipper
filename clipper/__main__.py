@@ -22,6 +22,8 @@ from .processor import pipeline
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)-7s %(name)-8s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("main")
+for _noisy in ("httpx", "httpx2", "google_genai", "google_genai.models"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 async def live_supervisor() -> None:
@@ -84,16 +86,32 @@ def cleanup() -> None:
 
 
 async def cleanup_loop() -> None:
+    from .processor import learn
     while True:
         await asyncio.to_thread(cleanup)
+        try:
+            await asyncio.to_thread(learn.refresh_views)
+        except Exception:
+            log.exception("view refresh failed")
         await asyncio.sleep(6 * 3600)
+
+
+async def discover_loop() -> None:
+    from .ingest import discover
+    await asyncio.sleep(30)
+    while True:
+        try:
+            await asyncio.to_thread(discover.run_once)
+        except Exception:
+            log.exception("auto-discover failed")
+        await asyncio.sleep(int(os.getenv("DISCOVER_MINUTES", "60")) * 60)
 
 
 async def main(mode: str) -> None:
     db.conn()
     tasks = []
     if mode in ("all", "worker"):
-        tasks += [live_supervisor(), vod_loop(), processor_loop(), cleanup_loop()]
+        tasks += [live_supervisor(), vod_loop(), processor_loop(), cleanup_loop(), discover_loop()]
     if mode in ("all", "dashboard"):
         server = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=DASHBOARD_PORT, log_level="warning"))
         tasks.append(server.serve())

@@ -12,7 +12,7 @@
   "heatmap_threshold": 0.75,
   "max_vod_windows": 8,
   "language": "ar",
-  "whisper_model": "medium",
+  "whisper_model": "large-v3-turbo",
   "emote_weights": {
     "KEKW": 3.0,
     "LUL": 2.0,

@@ -84,8 +84,10 @@
           <div class="flex gap-2">
             <template x-if="c.video_url"><a class="btn bg-indigo-600 hover:bg-indigo-500" :href="c.video_url" :download="`clip_${c.id}.mp4`">Download</a></template>
             <button class="btn" @click="copyCaption(c, $el)">Copy caption</button>
-            <button class="btn" x-show="c.status!=='posted'" @click="post(`/api/clips/${c.id}/posted`)">Mark posted</button>
-            <span x-show="c.status==='posted'" class="text-emerald-400 text-xs self-center">posted ✓</span>
+            <button class="btn" x-show="c.status!=='posted'" @click="markPosted(c)">Mark posted</button>
+            <span x-show="c.status==='posted'" class="text-emerald-400 text-xs self-center"
+                  x-text="c.views!=null ? `posted ✓ · ${c.views.toLocaleString()} views` : (c.post_url ? 'posted ✓ · views pending' : 'posted ✓')"></span>
+            <button class="btn" x-show="c.status==='posted' && !c.post_url" @click="markPosted(c)">Add link</button>
           </div>
         </div>
       </template>
@@ -133,6 +135,11 @@ function app(){return{
   async del(u){await this.j(u,{method:'DELETE'});this.load()},
   async copyCaption(c, el){const tags=(c.score_json?.hashtags||[]).slice(0,5).map(t=>'#'+t.replace(/^#/,'').replace(/\s/g,'')).join(' ');
     await navigator.clipboard.writeText(`${c.caption}\n\n${tags}`.trim());el.textContent='Copied ✓';setTimeout(()=>el.textContent='Copy caption',1500)},
+  async markPosted(c){
+    const url = prompt('Paste the link(s) to the posted video (TikTok / YouTube / Instagram), separated by spaces.\nAutoClipper tracks the views and learns what works. Leave empty to skip.', c.post_url||'');
+    if (url===null) return;
+    await this.post(`/api/clips/${c.id}/posted`, {url});
+  },
   async addStreamer(){await this.post('/api/streamers',this.form);this.form.channel=''},
   async load(){
     [this.ov,this.streams,this.clips,this.sched]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:'')),this.j('/api/schedule')]);

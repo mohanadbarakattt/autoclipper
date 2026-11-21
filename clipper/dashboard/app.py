@@ -164,7 +164,7 @@ def requeue(cid: int):
 
 @app.get("/api/schedule")
 def schedule():
-    rows = db.q("SELECT id, streamer_id, status, viral_score, hook, title, caption, score_json, out_path, scheduled_at "
+    rows = db.q("SELECT id, streamer_id, status, viral_score, hook, title, caption, score_json, out_path, scheduled_at, post_url, views "
                 "FROM candidates WHERE scheduled_at IS NOT NULL AND status IN ('ready','scheduled','drafted','posted') "
                 "ORDER BY scheduled_at")
     cutoff = time.time() - 86400
@@ -179,10 +179,22 @@ def schedule():
     return out
 
 
+class PostedIn(BaseModel):
+    url: str = ""
+
+
 @app.post("/api/clips/{cid}/posted")
-def mark_posted(cid: int):
-    db.update_candidate(cid, status="posted")
+def mark_posted(cid: int, body: PostedIn | None = None):
+    """Mark posted; optional link(s) to the live post(s) so views can be tracked and learned from."""
+    url = (body.url if body else "").strip()
+    db.update_candidate(cid, status="posted", posted_at=time.time(), **({"post_url": url} if url else {}))
     return {"ok": True}
+
+
+@app.post("/api/refresh-views")
+def refresh_views():
+    from ..processor import learn
+    return {"updated": learn.refresh_views()}
 
 
 @app.post("/api/clips/{cid}/approve")

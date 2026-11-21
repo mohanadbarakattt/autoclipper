@@ -18,6 +18,8 @@ log = logging.getLogger("live")
 
 CHECK_OFFLINE_SEC = 120
 CHECK_LIVE_SEC = 300
+MAX_RECORDINGS = int(__import__("os").getenv("MAX_LIVE_RECORDINGS", "4"))
+RECORDING: set[str] = set()
 
 
 class LiveWorker:
@@ -43,6 +45,8 @@ class LiveWorker:
             profile = load_profile(s["profile"])
             info = await asyncio.to_thread(platforms.live_info, s)
             want = info["live"] and platforms.matches_filter(info, profile)
+            if want and not self.rec.running and s.get("auto") and len(RECORDING) >= MAX_RECORDINGS:
+                want = False  # laptop at capacity: auto-found channels wait, your own channels always record
             db.upsert_status(self.sid, platform=s["platform"], channel=s["channel"], is_live=int(info["live"]),
                              title=info["title"], category=info["category"], recording=int(want))
             if want and not self.rec.running:
@@ -51,6 +55,7 @@ class LiveWorker:
                     self._chat_task.cancel()
                 self.det = SpikeDetector(profile)
                 self.rec.start(info["url"])
+                RECORDING.add(self.sid)
                 self._chat_task = asyncio.create_task(self._watch(info["url"], profile))
             elif not want and self.rec.running:
                 log.info("%s went offline / off-topic", self.sid)
@@ -70,6 +75,7 @@ class LiveWorker:
             self._chat_task = None
         if self.rec.running:
             self.rec.stop()
+        RECORDING.discard(self.sid)
         db.upsert_status(self.sid, platform=self.s["platform"], channel=self.s["channel"], recording=0, mps=0,
                          **({"is_live": 0} if paused else {}))
 
@@ -137,7 +143,7 @@ class LiveWorker:
                         await writer.drain()
                     elif " PRIVMSG " in line:
                         msg = line.split(" :", 1)[-1].strip()
-                        self.det.add(score_message(msg, profile))
+                        self.det.add(score_message(msg, profile), msg)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -169,7 +175,7 @@ class LiveWorker:
                     for m in ChatDownloader().get_chat(url, message_types=["text_message"]):
                         if stop.is_set():
                             return
-                        loop.call_soon_threadsafe(self.det.add, score_message(m.get("message") or "", profile))
+                        loop.call_soon_threadsafe(self.det.add, score_message(m.get("message") or "", profile), m.get("message") or "")
                 except Exception as e:
                     log.warning("youtube chat %s: %s", self.sid, e)
                 stop.wait(15)
