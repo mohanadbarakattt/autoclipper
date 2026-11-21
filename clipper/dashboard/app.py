@@ -28,6 +28,17 @@ def _dir_size(p: Path) -> int:
     return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
 
 
+def _thumb(r: dict) -> str | None:
+    """Poster for a rendered clip; made on demand for clips rendered before thumbnails existed."""
+    if not r.get("out_path") or not Path(r["out_path"]).exists():
+        return None
+    jpg = Path(r["out_path"]).with_suffix(".jpg")
+    if not jpg.exists():
+        from ..processor.render import make_thumb
+        make_thumb(Path(r["out_path"]))
+    return f"/media/{jpg.name}" if jpg.exists() else None
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
@@ -144,6 +155,7 @@ def clips(limit: int = 60, status: str | None = None):
         for k in ("gemini_json", "score_json", "trypost_post_ids"):
             r[k] = json.loads(r[k]) if r.get(k) else None
         r["video_url"] = f"/media/{Path(r['out_path']).name}" if r.get("out_path") and Path(r["out_path"]).exists() else None
+        r["thumb_url"] = _thumb(r)
     return rows
 
 
@@ -175,6 +187,7 @@ def schedule():
             continue
         r["score_json"] = json.loads(r["score_json"]) if r.get("score_json") else None
         r["video_url"] = f"/media/{Path(r['out_path']).name}" if r.get("out_path") and Path(r["out_path"]).exists() else None
+        r["thumb_url"] = _thumb(r)
         out.append(r)
     return out
 

@@ -40,7 +40,7 @@
       <form class="flex flex-wrap gap-2" @submit.prevent="addStreamer()">
         <select x-model="form.platform"><option>twitch</option><option>kick</option><option>youtube</option></select>
         <input x-model="form.channel" placeholder="channel / @handle" required class="w-40">
-        <select x-model="form.profile"><template x-for="p in Object.keys(profiles)"><option x-text="p"></option></template></select>
+        <select x-model="form.profile"><template x-for="p in Object.keys(profiles)" :key="p"><option :value="p" :selected="p===form.profile" x-text="p"></option></template></select>
         <button class="btn bg-indigo-600 hover:bg-indigo-500">Add</button>
         <button type="button" class="btn" @click="post('/api/scan-vods')">Scan VODs now</button>
       </form>
@@ -99,11 +99,12 @@
       <h2 class="font-bold">Clip pipeline</h2>
       <select x-model="filter" @change="load()"><option value="">all</option><option>pending</option><option>ready</option><option>scheduled</option><option>rejected</option><option>failed</option><option>publish_failed</option></select>
     </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
       <template x-for="c in clips" :key="c.id">
         <div class="card overflow-hidden flex flex-col">
-          <template x-if="c.video_url"><video :src="c.video_url" controls preload="none" class="w-full aspect-[9/16] bg-black"></video></template>
-          <template x-if="!c.video_url"><div class="aspect-[9/16] bg-slate-900 grid place-items-center text-xs text-slate-500" x-text="c.status"></div></template>
+          <template x-if="c.video_url"><video :src="c.video_url" :poster="c.thumb_url" controls preload="none" class="w-full aspect-[9/16] bg-black object-cover"></video></template>
+          <template x-if="!c.video_url"><div class="h-20 bg-slate-900 grid place-items-center text-xs uppercase tracking-wide"
+               :class="['pending','analyzing','rendering'].includes(c.status) ? 'text-indigo-300 animate-pulse' : 'text-slate-500'" x-text="c.status"></div></template>
           <div class="p-3 space-y-1 text-xs">
             <div class="flex justify-between"><span class="font-semibold" x-text="'#'+c.id+' '+c.streamer_id"></span>
               <span class="px-2 rounded-full" :class="{'bg-emerald-800':['scheduled','drafted','ready'].includes(c.status),'bg-red-900':['failed','publish_failed'].includes(c.status),'bg-slate-700':c.status==='rejected','bg-indigo-800':['pending','analyzing','rendering'].includes(c.status)}" x-text="c.status"></span></div>
@@ -128,7 +129,7 @@
 <script>
 function app(){return{
   ov:{},health:{},streams:[],clips:[],sched:[],
-  fmt(iso,tz){return new Date(iso).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',...(tz?{timeZone:tz}:{})})},profiles:{},filter:'',form:{platform:'twitch',channel:'',profile:'default'},
+  fmt(iso,tz){return new Date(iso).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',...(tz?{timeZone:tz}:{})})},profiles:{},filter:'',form:{platform:'twitch',channel:'',profile:'gaming'},
   kpis(){return[['Recording now',this.ov.live_recording],['Clips (24h)',this.ov.clips_today],['Avg score (24h)',this.ov.avg_score_24h],['In queue',this.ov.queue],['Data on disk',(this.ov.data_gb??0)+' GB']]},
   async j(u,o){const r=await fetch(u,o);if(!r.ok){alert((await r.text()).slice(0,300));throw r}return r.json()},
   async post(u,b){await this.j(u,{method:'POST',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):null});this.load()},

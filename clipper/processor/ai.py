@@ -148,7 +148,7 @@ def gemini_verify(proxy: Path, profile: dict, context: str, duration: float) -> 
         prompt = f"""You are a senior short-form video editor for the niche: {profile['niche_description']}.
 This is a {duration:.0f}s candidate excerpt from a livestream (480p, 1 frame per second, with audio).
 Why it was flagged: {context}
-
+{("Campaign rules this clip must follow (reject it if it breaks them):" + chr(10) + profile['campaign_rules'][:2000] + chr(10)) if profile.get('campaign_rules') else ''}
 Decide if it contains a standalone moment that would hold a cold viewer on TikTok/Reels/Shorts
 (big reaction, funny line, fail, clutch play, shocking reveal, strong take). Ordinary gameplay,
 driving around, menus, missions without a twist, or chatting is NOT viral.
@@ -241,6 +241,9 @@ def score_clip(transcript: str, verdict: dict, profile: dict, platform: str, str
 
 def _score_prompt(transcript: str, verdict: dict, profile: dict, platform: str, streamer: str, learn: str) -> str:
     learn_block = f"\nWhat has actually performed on THIS page (real view counts - weigh this heavily):\n{learn}\n" if learn else ""
+    if profile.get("campaign_rules"):
+        learn_block += ("\nThis clip is for a paid clipping campaign. Its rules (a clip that breaks them scores 1, "
+                        f"and the hook/title/caption must follow them):\n{profile['campaign_rules'][:3000]}\n")
     return f"""You decide which livestream clips get posted as Shorts/Reels/TikToks for a page about: {profile['niche_description']}.{learn_block}
 Source: {platform} streamer "{streamer}".
 What happens ON SCREEN (a video model watched the whole clip - trust this, you can't see the video):

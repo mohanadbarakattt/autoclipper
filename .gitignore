@@ -7,3 +7,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# private business data (campaigns/clients live in the Pro CRM)
+config/profiles/campaign_*.json
+config/profiles/client_*.json
+config/profiles/lead_*.json

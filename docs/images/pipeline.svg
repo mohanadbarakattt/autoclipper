@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 330" width="1200" height="330" role="img" aria-label="AutoClipper pipeline: watch, detect, verify, score, render, deliver">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker>
+  </defs>
+  <rect width="1200" height="330" rx="20" fill="#0b0d12"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <g id="steps">
+      <!-- 1 -->
+      <rect x="24" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#334155"/>
+      <text x="110" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#a5b4fc">1 · WATCH</text>
+      <text x="110" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">Live streams</text>
+      <text x="110" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">30-min buffer</text>
+      <text x="110" y="154" text-anchor="middle" font-size="14" fill="#e2e8f0">Finished VODs</text>
+      <text x="110" y="174" text-anchor="middle" font-size="14" fill="#e2e8f0">(peaks only)</text>
+      <text x="110" y="204" text-anchor="middle" font-size="12" fill="#64748b">auto-finds top streams</text>
+      <!-- 2 -->
+      <rect x="220" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#334155"/>
+      <text x="306" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#a5b4fc">2 · DETECT</text>
+      <text x="306" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">Chat spikes</text>
+      <text x="306" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">"Most Replayed"</text>
+      <text x="306" y="144" text-anchor="middle" font-size="14" fill="#e2e8f0">Viewer clips</text>
+      <text x="306" y="164" text-anchor="middle" font-size="14" fill="#e2e8f0">Audio peaks</text>
+      <text x="306" y="204" text-anchor="middle" font-size="12" fill="#64748b">no AI · filters ~95%</text>
+      <!-- 3 -->
+      <rect x="416" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#334155"/>
+      <text x="502" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#a5b4fc">3 · VERIFY</text>
+      <text x="502" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">Gemini watches</text>
+      <text x="502" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">a 480p proxy</text>
+      <text x="502" y="154" text-anchor="middle" font-size="14" fill="#e2e8f0">cuts · facecam ·</text>
+      <text x="502" y="174" text-anchor="middle" font-size="14" fill="#e2e8f0">action track · payoff</text>
+      <text x="502" y="204" text-anchor="middle" font-size="12" fill="#64748b">free API key</text>
+      <!-- 4 -->
+      <rect x="612" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#334155"/>
+      <text x="698" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#a5b4fc">4 · SCORE</text>
+      <text x="698" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">Whisper transcript</text>
+      <text x="698" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">Gemini scores 1-10</text>
+      <text x="698" y="144" text-anchor="middle" font-size="14" fill="#e2e8f0">Claude final check</text>
+      <text x="698" y="164" text-anchor="middle" font-size="14" fill="#e2e8f0">hook · title · caption</text>
+      <text x="698" y="204" text-anchor="middle" font-size="12" fill="#64748b">learns from your views</text>
+      <!-- 5 -->
+      <rect x="808" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#334155"/>
+      <text x="894" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#a5b4fc">5 · RENDER</text>
+      <text x="894" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">1080×1920</text>
+      <text x="894" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">crop follows action</text>
+      <text x="894" y="144" text-anchor="middle" font-size="14" fill="#e2e8f0">zoom on payoff</text>
+      <text x="894" y="164" text-anchor="middle" font-size="14" fill="#e2e8f0">karaoke captions</text>
+      <text x="894" y="204" text-anchor="middle" font-size="12" fill="#64748b">FFmpeg, local</text>
+      <!-- 6 -->
+      <rect x="1004" y="40" width="172" height="180" rx="14" fill="#141821" stroke="#6366f1"/>
+      <text x="1090" y="74" text-anchor="middle" font-size="15" font-weight="700" fill="#f0abfc">6 · DELIVER</text>
+      <text x="1090" y="104" text-anchor="middle" font-size="14" fill="#e2e8f0">Posting schedule</text>
+      <text x="1090" y="124" text-anchor="middle" font-size="14" fill="#e2e8f0">Google Drive folder</text>
+      <text x="1090" y="144" text-anchor="middle" font-size="14" fill="#e2e8f0">+ caption file</text>
+      <text x="1090" y="164" text-anchor="middle" font-size="14" fill="#e2e8f0">or auto-post (TryPost)</text>
+      <text x="1090" y="204" text-anchor="middle" font-size="12" fill="#64748b">Shorts · Reels · TikTok</text>
+    </g>
+    <g stroke="#94a3b8" stroke-width="2" marker-end="url(#ar)">
+      <line x1="198" y1="130" x2="217" y2="130"/><line x1="394" y1="130" x2="413" y2="130"/>
+      <line x1="590" y1="130" x2="609" y2="130"/><line x1="786" y1="130" x2="805" y2="130"/>
+      <line x1="982" y1="130" x2="1001" y2="130"/>
+    </g>
+    <text x="600" y="276" text-anchor="middle" font-size="16" fill="#94a3b8">Rejected at any step = no wasted AI or render time.  Duplicates of the same moment are dropped automatically.</text>
+    <text x="600" y="302" text-anchor="middle" font-size="14" fill="#64748b">Everything runs on your PC. The only accounts you need: a free Gemini key (and optionally your Claude plan).</text>
+  </g>
+</svg>

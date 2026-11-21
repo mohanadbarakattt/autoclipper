@@ -157,6 +157,17 @@ def layout_filter(W: int, H: int, mode: str, facecam: list[int] | None, center_x
             f"[bg][fg]overlay=0:(H-h)/2{_zoom(OW, OH, payoff)},setsar=1")
 
 
+def make_thumb(video: Path, at: float = 1.5) -> Path | None:
+    """Poster image for the dashboard (same name, .jpg)."""
+    thumb = video.with_suffix(".jpg")
+    try:
+        run([FFMPEG, "-y", "-v", "error", "-ss", f"{max(0.0, at):.2f}", "-i", str(video), "-frames:v", "1",
+             "-vf", "scale=360:-2", "-q:v", "4", str(thumb)], timeout=60)
+        return thumb
+    except Exception:
+        return None
+
+
 def pick_layout(profile_mode: str, verdict: dict) -> str:
     if profile_mode != "auto":
         if profile_mode == "stacked_facecam" and not verdict.get("facecam_box"):
@@ -174,7 +185,10 @@ def render_vertical(src: Path, out: Path, workdir: Path, words: list[dict], hook
     info = probe(src)
     mode = pick_layout(profile.get("layout_mode", "auto"), verdict)
     ass = workdir / "subs.ass"
-    ass.write_text(build_ass(words, hook, profile["caption_style"], profile["hook_style"], info["duration"]), encoding="utf-8")
+    hk = dict(profile["hook_style"])
+    if mode == "stacked_facecam":
+        hk["margin_v"] = TOP_H - hk.get("font_size", 64) // 2 - 22  # sit on the seam, never cover the face
+    ass.write_text(build_ass(words, hook, profile["caption_style"], hk, info["duration"]), encoding="utf-8")
     # libass paths: relative to ROOT with forward slashes (avoids Windows drive-letter escaping)
     rel_ass = os.path.relpath(ass, ROOT).replace("\\", "/")
     rel_fonts = os.path.relpath(FONTS_DIR, ROOT).replace("\\", "/")
@@ -192,5 +206,6 @@ def render_vertical(src: Path, out: Path, workdir: Path, words: list[dict], hook
     cmd += ["-c:v", "libx264", "-preset", os.getenv("X264_PRESET", "medium"), "-crf", "20", "-pix_fmt", "yuv420p",
             "-r", "30", "-movflags", "+faststart", str(out)]
     run(cmd, timeout=1800, cwd=str(ROOT))
+    make_thumb(out, payoff if payoff is not None else min(2.0, info["duration"] / 2))
     log.info("rendered %s (%s)", out.name, mode)
     return out

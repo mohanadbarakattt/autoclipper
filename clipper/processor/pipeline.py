@@ -30,6 +30,17 @@ def _clamp(start: float, end: float, dur: float, mn: float, mx: float) -> tuple[
     return start, end
 
 
+def apply_campaign_rules(score: dict, profile: dict) -> None:
+    """Clipping-campaign requirements from the profile: required hashtags first, required caption text appended."""
+    req = [t.lstrip("#").strip() for t in profile.get("required_hashtags") or [] if t.strip()]
+    if req:
+        rest = [t for t in score.get("hashtags", []) if t.lstrip("#").lower() not in {r.lower() for r in req}]
+        score["hashtags"] = (req + rest)[: max(len(req), int(profile.get("publish", {}).get("max_hashtags", 5)))]
+    suffix = (profile.get("caption_suffix") or "").strip()
+    if suffix and suffix not in score.get("caption", ""):
+        score["caption"] = f"{score.get('caption', '').rstrip()}\n{suffix}"
+
+
 def process(cand: dict) -> None:
     cid = cand["id"]
     profile = load_profile(cand["profile"])
@@ -69,6 +80,7 @@ def process(cand: dict) -> None:
         score, scorer = ai.score_clip(transcript, verdict, profile, cand["platform"], streamer, examples)
         score["scorer"] = scorer
         score["transcript"] = transcript
+        apply_campaign_rules(score, profile)
         db.update_candidate(cid, score_json=score, viral_score=score["viral_score"], hook=score["top_banner_hook"],
                             title=score["title"], caption=score["caption"])
         if score["viral_score"] < float(profile["min_viral_score"]):

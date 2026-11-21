@@ -37,7 +37,9 @@ def export_clip(cid: int) -> Path | None:
     when = datetime.fromisoformat(c["scheduled_at"]) if c.get("scheduled_at") else datetime.now(timezone.utc)
     when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
     show, local = when.astimezone(ZoneInfo(SHOW_TZ)), when.astimezone(ZoneInfo(LOCAL_TZ))
-    folder = Path(root) / show.strftime("%Y-%m-%d")
+    from ..config import load_profile
+    sub = _safe(load_profile(c["profile"]).get("export_subdir") or "") if c.get("profile") else ""
+    folder = (Path(root) / sub if sub else Path(root)) / show.strftime("%Y-%m-%d")  # e.g. one folder per client
     folder.mkdir(parents=True, exist_ok=True)
     base = f"{show:%H%M} {show.tzname()} - {_safe(c.get('title') or c.get('hook') or f'clip {cid}')}"
     dest = folder / f"{base}.mp4"

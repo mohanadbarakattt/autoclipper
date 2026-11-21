@@ -1,136 +1,202 @@
-# AutoClipper
+<p align="center">
+  <img src="docs/images/banner.svg" alt="AutoClipper: livestreams in, viral vertical clips out" width="100%">
+</p>
 
-Self-hosted, **$0/month** stream clipper. It watches Twitch, Kick and YouTube streamers (live and past
-VODs), finds the moments chat or viewers went crazy for, turns them into 1080×1920 vertical clips with
-word-by-word karaoke captions and a hook banner, and schedules them to YouTube Shorts, Instagram Reels
-and TikTok through a self-hosted [TryPost](https://github.com/trypostit/trypost).
+<p align="center">
+  <b>Self-hosted, $0/month stream clipper.</b> It watches Twitch, Kick and YouTube streams, finds the moments
+  chat went crazy for, and turns them into ready-to-post Shorts, Reels and TikToks: captions, hook and all.<br>
+  Comes with a ready-made <b>GTA 6</b> preset.
+</p>
 
+<p align="center">
+  <a href="#-install-in-one-line">Install</a> ·
+  <a href="#-how-it-works">How it works</a> ·
+  <a href="#-make-money-with-it-the-right-way">Make money</a> ·
+  <a href="#%EF%B8%8F-settings">Settings</a> ·
+  <a href="#-faq">FAQ</a>
+</p>
+
+---
+
+<table>
+<tr>
+<td width="290" valign="top"><img src="docs/images/demo.gif" alt="A rendered clip: webcam on top, gameplay below, hook banner and word-by-word captions" width="270"></td>
+<td valign="top">
+
+### What you get
+
+- 🎯 **Finds the moments**: chat spikes, YouTube's "Most Replayed" peaks, viewer-clip clusters and audio peaks. No AI is spent on dead air.
+- 🧠 **Two AI judges, both free**: Gemini watches the clip; Claude (your existing plan, optional) gives the final word.
+- 🎬 **Edits like a human**: 9:16 crop that **follows the action**, webcam stacked on top, a **zoom on the punchline**, word-by-word karaoke captions and a 3.5 s hook banner.
+- 📅 **Posting schedule**: 3 peak-time slots a day, with every clip + caption file copied to your **Google Drive**.
+- 📈 **Learns from your views**: paste the link after posting, and it tracks views and scores future clips like your best ones.
+- 🔎 **Finds streams for you**: picks up the biggest live streams in your niche every hour.
+- 🧹 **No duplicates**, no full-VOD downloads, cleans up after itself.
+
+<sub>The demo above uses a synthetic test scene, not real stream footage.</sub>
+
+</td>
+</tr>
+</table>
+
+## 🚀 Install in one line
+
+**Windows**: open **PowerShell** (Start → type `PowerShell`) and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/mohanadbarakattt/autoclipper/main/install.ps1 | iex
 ```
- Twitch / Kick / YouTube
-        │  live: streamlink → 30-min ring buffer      VOD: "Most Replayed" heatmap / viewer clip clusters / audio peaks
-        ▼
- cheap local signals (chat velocity, emotes, clip clusters, loudness)  ← filters out ~95% before any AI runs
-        ▼
- Gemini (free key) watches a 480p · 1fps proxy → is it viral? exact cut points, facecam box
-        ▼
- faster-whisper transcript → Claude (your Claude subscription via Claude Code) scores 1-10 + writes the hook
-        ▼
- FFmpeg: stacked facecam / speaker crop / blur-fit + karaoke captions + 3.5 s hook pill
-        ▼
- TryPost (self-hosted) schedules to Shorts, Reels, TikTok with spacing + daily caps
-        ▲
- OpenBot (optional): daily health digest, auto-restarts, "add xqc on twitch" in plain English
+
+**macOS / Linux**: open Terminal and paste:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mohanadbarakattt/autoclipper/main/install.sh | bash
 ```
 
-## What it costs
+That installs Python and FFmpeg if you don't have them, downloads AutoClipper to `~/AutoClipper`, adds a
+**Desktop shortcut** (Windows) and starts it. Run the same line again any time to update; your keys, streamers
+and clips are kept.
+
+### First start (one time, about 10 minutes)
+
+| Step | What happens |
+|---|---|
+| 1 | It installs its own packages and the speech-to-text model. Let it run. |
+| 2 | A browser tab opens on **Google AI Studio** → click **Create API key** → paste it into the window. Free, no card. |
+| 3 | *(Optional)* If you have [Claude Code](https://claude.com/claude-code) and a Claude plan, it offers to log you in. Without it, Gemini does everything. |
+| 4 | Answer **Y** to *start with Windows*. Your dashboard opens at **http://localhost:8090**. |
+
+Then add a streamer in the dashboard (or pick the `gta6` preset, which finds GTA 6 streams by itself) and wait
+for clips to appear.
+
+<details>
+<summary><b>Manual install</b> (git clone)</summary>
+
+```bash
+git clone https://github.com/mohanadbarakattt/autoclipper && cd autoclipper
+# Windows: double-click start.bat        macOS / Linux: ./start.sh
+```
+Requires Python 3.10+ and FFmpeg on your PATH.
+</details>
+
+## 🖥️ The dashboard
+
+<img src="docs/images/dashboard.png" alt="AutoClipper dashboard: streamers being recorded, posting schedule, clip pipeline" width="100%">
+
+- **Streamers**: who is live, what's being recorded, chat speed. Add, pause or remove channels.
+- **Posting schedule**: each finished clip gets a slot (your local time is shown too). **Download**, **Copy caption**, then **Mark posted** and paste the post link so it can track views.
+- **Clip pipeline**: every candidate and why it passed or got rejected.
+
+## 🔍 How it works
+
+<img src="docs/images/pipeline.svg" alt="Pipeline: watch, detect, verify, score, render, deliver" width="100%">
+
+It picks the layout for each clip automatically:
+
+<img src="docs/images/layouts.png" alt="Three layouts: stacked facecam, speaker crop, blur fit" width="100%">
+
+## 💸 What it costs
 
 | Piece | Cost |
 |---|---|
-| Gemini 2.5 Flash | **$0** with a free [AI Studio key](https://aistudio.google.com/apikey) (free tier, no billing; ~10 req/min). Note: Google may use free-tier inputs to improve its models. |
-| Claude | **$0 extra**: runs `claude -p` (Claude Code headless) on the Claude Pro/Max plan you already pay for. No Anthropic API key. If Claude isn't set up, Gemini does the scoring. |
-| TryPost, FFmpeg, faster-whisper, yt-dlp, streamlink | **$0**, open source, run locally |
-| Twitch / Kick developer apps | **$0** (optional) |
-| Public HTTPS for OAuth callbacks | **$0**: Cloudflare Tunnel (needs a domain you already own) or an ngrok free static domain |
+| Gemini | **$0**: free [AI Studio key](https://aistudio.google.com/apikey), no billing. Google may use free-tier inputs to improve its models. |
+| Claude | **$0 extra, optional**: runs Claude Code on the plan you already have (no API key). It only checks the clips that already passed, so it uses little of your limit. |
+| Whisper, FFmpeg, yt-dlp, streamlink | **$0**, open source, run on your PC |
+| Hardware | Any PC that can stay on. CPU-only is fine. Keep ~20 GB free. |
 
-Hardware: any PC that can stay on. CPU-only is fine (a clip takes a few minutes to render). Budget ~20 GB disk.
+## 💰 Make money with it, the right way
 
-## Easy mode (Windows, 2 minutes)
+Reposting someone's stream without permission gets accounts struck. These ways pay and keep you safe:
 
-No Docker, no TryPost, no developer accounts. Clips land in the dashboard with **Download** and **Copy caption** buttons; you post them yourself.
+1. **Paid clipping campaigns.** Streamers and brands pay clippers per view on marketplaces such as
+   [Content Rewards](https://contentrewards.com). The typical rate is **about $1 per 1,000 views** (range $0.05–$3).
+   Join a campaign, set up a profile with its rules, post your clips, submit the links.
+   *Example math: 3 clips/day × 30k views ≈ 2.7M views/month ≈ $2,700 at $1 per 1,000. Treat that as an
+   upside figure, not a promise.*
+2. **Clipping as a service.** Small streamers (50–1,000 viewers) rarely have an editor. Send 3 free clips
+   from their last stream, then offer a monthly package.
+3. **Your own streams or podcast.** Clip yourself, no permission needed.
 
-1. Download this repo (Code → Download ZIP, or `git clone`) and double-click **`start.bat`**.
-2. First run installs everything, then asks you to paste a free Gemini key (it opens the page for you).
-3. If Claude Code is installed, it checks you're logged in to Claude and helps you log in once. Without it, Gemini writes the hooks.
-4. Say **Y** to "start with Windows". The dashboard opens at http://localhost:8090. Add streamers there.
+**Always:** credit the streamer (captions do this automatically), follow each campaign's rules, and start in
+draft mode until you trust the output. You are responsible for what your accounts post.
 
-Want hands-off posting later? Follow the full setup below to add TryPost.
+## ⚙️ Settings
 
-## Full setup with auto-posting (Docker + TryPost)
+Each streamer uses a **profile** in `config/profiles/` (`gta6`, `gaming`, `podcast`, `arabic`, `default`).
+Copy one to start a new niche; any key you leave out uses the default in `clipper/config.py`.
 
-**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (free for personal use), Python 3.10+, Git.
-
-```bash
-git clone https://github.com/<you>/autoclipper && cd autoclipper
-python scripts/setup.py --public-url https://post.yourdomain.com
-```
-
-1. **Gemini**: put your free key in `.env` → `GEMINI_API_KEY=`.
-2. **Claude (subscription, no API key)**:
-   ```bash
-   npm install -g @anthropic-ai/claude-code
-   claude setup-token
-   ```
-   Paste the token into `.env` → `CLAUDE_CODE_OAUTH_TOKEN=`. Usage counts against your plan's normal limits.
-3. **Start everything**: `docker compose up -d --build`
-4. **TryPost first run**:
-   ```bash
-   docker compose exec trypost php artisan db:seed --force
-   docker compose exec trypost php artisan db:seed --class=UserSeeder --force
-   ```
-   Open http://localhost:8000, log in as `admin@trypost.it` / `password`, **change the password**.
-5. **Public URL** (needed for YouTube/Instagram/TikTok login): point a Cloudflare Tunnel or ngrok static
-   domain at `localhost:8000`. With Cloudflare: put `CLOUDFLARE_TUNNEL_TOKEN=` in `.env`, then
-   `docker compose --profile tunnel up -d`.
-6. **Social apps**: see [docs/SOCIAL_SETUP.md](docs/SOCIAL_SETUP.md). Put the client IDs/secrets in
-   `trypost.env`, run `docker compose up -d trypost`, then connect your accounts inside TryPost.
-7. **TryPost API key**: TryPost → Settings → API → Generate. Put it in `.env` → `TRYPOST_API_KEY=` and run
-   `docker compose up -d clipper`.
-8. **Add streamers**: open http://localhost:8090 and add channels, or edit `config/streamers.json`.
-
-That's it. From now on it runs by itself and restarts after reboots (Docker Desktop: enable *Start when you sign in*).
-
-### OpenBot (optional manager)
-Paste the prompt in [openbot/ROUTINES.md](openbot/ROUTINES.md) into OpenBot for a daily digest,
-self-healing and chat-style channel management.
-
-## Niche profiles
-
-Each streamer uses a profile in `config/profiles/` (`gaming`, `gta6`, `podcast`, `default`). A profile
-controls the topic filter, layout, clip length, score gate, posting cadence, emote weights and caption
-style. Copy one to start a new niche. Every key you leave out uses the default in `clipper/config.py`.
-
-| Key | Meaning |
+| Key | What it does |
 |---|---|
-| `game_or_topic_filter` | Only clip when the category/title matches (`A\|B\|C`). Empty = everything. |
-| `layout_mode` | `auto`, `stacked_facecam` (webcam top 35% + gameplay), `speaker_crop`, `blur_fit` |
-| `min_viral_score` | Claude's score gate (1-10) |
-| `max_posts_per_day`, `post_spacing_hours` | Posting cadence per profile |
-| `publish.mode` | `scheduled` (auto-post), `draft` (lands in TryPost for you to approve), `off` |
-| `publish.tiktok_privacy` | Keep `SELF_ONLY` until TikTok approves your app audit, then `PUBLIC_TO_EVERYONE` |
+| `game_or_topic_filter` | Only clip when the stream's category matches (`A\|B\|C`). Empty = everything. |
+| `auto_discover` | Find the top live streams for this niche every hour (`twitch_game`, `kick_category`, `youtube_query`, `top_n`, `min_viewers`). |
+| `layout_mode` | `auto`, `stacked_facecam`, `speaker_crop`, `blur_fit` |
+| `clip_duration` | Min/max seconds (shorter = better completion rate) |
+| `min_viral_score` | Score gate (1–10). Lower it if almost nothing passes. |
+| `posting_times`, `posting_timezone` | Daily posting slots (default 12:00 / 17:00 / 21:00 New York) |
+| `whisper_model` | `large-v3-turbo` (default, accurate) or `small` (faster on slow PCs) |
+| `language` | `en`, `ar`, … or leave empty to auto-detect |
+| `follow_action`, `payoff_zoom` | Moving crop and punchline zoom on/off |
 
-## Test without any streams
+Useful `.env` options: `EXPORT_DIR` (Google Drive folder), `MAX_LIVE_RECORDINGS`, `SCORER` (`auto` / `gemini` / `claude`).
 
-```bash
-pip install -r requirements.txt
-python scripts/get_fonts.py
-python -m clipper process-file path/to/any_clip.mp4 gaming
-```
-Runs Gemini → Claude → render on a local file and prints where the vertical MP4 landed.
-Or queue any YouTube/Twitch VOD section from the dashboard API: `POST /api/manual {"url","start","end"}`.
+**Optional free platform keys** (better signals): [Twitch app](https://dev.twitch.tv/console/apps) for game
+filtering, viewer-clip peaks and Twitch auto-discovery; [Kick app](https://kick.com/settings/developer) for
+Kick auto-discovery.
 
-## Platform notes
+**Hands-off auto-posting** to YouTube / Instagram / TikTok via self-hosted [TryPost](https://github.com/trypostit/trypost):
+see [docs/AUTOPOST.md](docs/AUTOPOST.md) and [docs/SOCIAL_SETUP.md](docs/SOCIAL_SETUP.md).
 
-- **Twitch**: anonymous chat + streamlink. Add free Twitch app keys for the category filter and the viewer clip-cluster signal (also used to find peaks in finished VODs).
-- **YouTube**: live chat via chat-downloader. Finished streams use YouTube's "Most Replayed" heatmap, so only the peak minutes are ever downloaded.
-- **Kick**: live only. Live status comes from Kick's official public API (free app keys) or streamlink. Highlights are found from audio loudness spikes, since Kick has no public chat feed without webhooks.
-- Full VODs are never downloaded. Live buffers keep 30 minutes and overwrite themselves.
+## ❓ FAQ
 
-## Use it responsibly
+<details><summary><b>Nothing is passing the score gate</b></summary>
 
-Reposting someone else's stream is their content. Clip streamers who allow it (many run clipping
-programs and pay clippers), credit them (the caption includes the streamer's name), and expect
-YouTube and TikTok to demonetize or strike unoriginal reuploads. You are responsible for what your
-accounts post. Start with `publish.mode: "draft"` until you trust the output.
+That's normal for the first hours: most moments in a stream aren't viral. Check the rejection reasons in the
+Clip pipeline. If good moments are rejected, lower `min_viral_score` by 0.5. Bigger streams with busy chats
+produce far more usable moments.
+</details>
 
-## Layout
+<details><summary><b>Do I need a Claude subscription?</b></summary>
+
+No. Gemini handles everything on its own. Claude only adds a stricter final check if you have it.
+</details>
+
+<details><summary><b>Will it slow my PC down?</b></summary>
+
+Each live recording uses a little CPU and ~1 GB of rolling disk space; rendering a clip uses the CPU for a
+minute or two. `MAX_LIVE_RECORDINGS` (default 4) caps how many streams record at once.
+</details>
+
+<details><summary><b>Where are my clips?</b></summary>
+
+`data/ready_clips/` and, if `EXPORT_DIR` is set, in your Google Drive folder, sorted by posting day with a
+caption `.txt` next to each video.
+</details>
+
+<details><summary><b>Gemini says "busy" / 503</b></summary>
+
+The free tier gets overloaded at peak times. AutoClipper automatically falls back to the lighter Flash-Lite
+model and retries, so you don't need to do anything.
+</details>
+
+## ❤️ Support the project
+
+AutoClipper is free and open source. If it makes you money, consider supporting it:
+
+<!-- TODO before going public: replace with real links / addresses -->
+- **Sponsor:** _Polar link coming soon_
+- **Crypto:** _addresses coming soon_
+- **Hosted version** (no PC needed): _waitlist coming soon_
+
+## 🧩 Project layout
 
 ```
 clipper/
-  ingest/      live.py (per-streamer worker) · ringbuffer.py · spikes.py · platforms.py · vod.py
-  processor/   ai.py (Gemini + Claude CLI) · render.py (whisper + ASS + ffmpeg) · publish.py (TryPost) · pipeline.py
+  ingest/      live.py · ringbuffer.py · spikes.py · platforms.py · vod.py · discover.py
+  processor/   ai.py (Gemini + Claude) · render.py · learn.py · publish.py · export.py · pipeline.py
   dashboard/   app.py (FastAPI) · static/index.html
 config/        streamers.json · profiles/*.json
 data/          state/clipper.db · ring_buffers · candidates · ready_clips
 ```
 
-MIT licensed. TryPost is AGPL-3.0 and runs as its own container.
+MIT licensed. TryPost is AGPL-3.0 and runs as its own container. Not affiliated with Rockstar Games, Twitch,
+Kick, YouTube, Google or Anthropic.
