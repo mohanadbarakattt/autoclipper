@@ -1,230 +1,174 @@
-# AutoClipper Cloud: SaaS plan
+# Virlo Studio: the hosted AutoClipper
 
-Status: **draft for approval** · branch `saas` · 2026-11-21
+Status: **draft v2 for approval** · branch `saas` · 2026-11-21 · website: **virlo.studio**
 
-AutoClipper Cloud is the hosted, multi-user version of the open-source engine in `clipper/`. A user signs up,
-pastes a Twitch / Kick / YouTube channel, and finished 1080x1920 clips (captions, hook, moving crop, payoff zoom,
-posting schedule) show up in their dashboard. No PC, no API keys, no FFmpeg on their side.
+Virlo Studio is AutoClipper as a website. It works exactly like our AutoClipper (same engine, same clips), with a
+proper user interface on top: sign up, paste a channel, get ready-to-post vertical clips. Nothing to install, no
+API keys, no PC left running.
 
-Three products, kept separate:
+Goals, in order:
+1. **Same engine, same results**: reuse `clipper/` unchanged; every engine improvement ships to the site.
+2. **Great UI and functionality**: simple enough for a streamer who has never edited a clip.
+3. **Cheap to use, generous free plan**, priced so every plan, free included, pays for itself.
+4. **Robust and sustainable**: fails safely, can't run up an AI bill, cheap to keep running.
 
-| Product | Who | Where |
-|---|---|---|
-| AutoClipper (open source) | anyone self-hosting, $0 | `main` branch, public repo |
-| AutoClipper Pro CRM | you, for your own clipping business | private `autoclipper-pro`, untouched |
-| **AutoClipper Cloud** (this plan) | paying users | `saas/` package on this branch, same repo, engine reused |
+## 1. Decisions
 
-## 1. Decisions taken (2026-11-21)
-
-| Question | Decision |
+| Topic | Decision |
 |---|---|
-| Customer | **Anyone, any channel** (own streams, clipping campaigns, clip pages). Safeguards in §6. |
-| Pricing | **3 tiers, $19 / $49 / $99 per month**, free trial (§5) |
-| Hosting budget at launch | **~$20-50/month**, one CPU server + object storage, GPU later |
-| Domain | **virlo.studio** (you own it): app at `app.virlo.studio`, landing page at the root. It ties the hosted clipper into the Virlo brand. |
-| Payments | **Polar** (merchant of record; lists Egypt as a payout country via Stripe Connect Express). Gumroad stays the fallback; billing sits behind one adapter so the swap is a single file. |
+| Who can use it | Anyone, any channel, with rights confirmation, a creator opt-out list and a takedown process (§7) |
+| Plans | Free forever + $9 / $19 / $39 (§5) |
+| Payments | Polar (lists Egypt as a payout country); Gumroad as fallback behind the same adapter |
+| Website | `virlo.studio` (landing + pricing), `app.virlo.studio` (the app) |
+| Hosting | one cheap server to start (§8); not a focus of this plan |
 
-## 2. Architecture
+## 2. The user's journey
 
-```
-            browser
-               │  HTTPS (Cloudflare in front: TLS, caching, DDoS)
-      ┌────────▼─────────┐
-      │  saas web (FastAPI)│  signup/login, channels, clips, billing webhooks, admin
-      └──┬─────────────┬──┘
-         │ control DB  │ job rows
-   ┌─────▼─────┐  ┌────▼─────────────────────────────┐
-   │ saas.db   │  │ scheduler / worker pool (saas.worker)│
-   │ users,    │  │  - picks tenants with work due      │
-   │ channels, │  │  - runs the ENGINE in a subprocess  │
-   │ usage...  │  │    with CLIPPER_ROOT=workspaces/<id>│
-   └───────────┘  └────┬─────────────────────────────┘
-                       │ unchanged engine: vod.poll_all → pipeline.run_once
-                ┌──────▼───────────────────────────────┐
-                │ workspaces/<tenant>/                   │
-                │   config/streamers.json, profiles/     │  ← written by the web app
-                │   data/state/clipper.db, ready_clips/  │  ← written by the engine
-                └──────┬───────────────────────────────┘
-                       │ finished clip
-                 Cloudflare R2 (clips, thumbs; signed URLs, 30-day retention)
-```
+1. **Lands on virlo.studio**: demo clip playing, "Paste your channel, get viral clips", pricing, sign up free.
+2. **Signs up**: email + password (Google sign-in later). No card for the free plan.
+3. **Onboarding wizard (3 steps, under a minute)**
+   1. Paste a Twitch / Kick / YouTube link → platform and channel detected automatically, avatar shown.
+   2. Pick a style: **Gaming**, **GTA 6**, **Podcast / Talk**, **Arabic**, **General** (the existing profiles), with a
+      preview of the caption look.
+   3. Confirm rights ("my channel" / "I have permission" / "clipping campaign" / "other, my responsibility").
+   → "We're scanning your latest streams. First clips usually arrive in 20-40 minutes." Progress shown live.
+4. **Gets clips**: an email/notification when clips are ready; opens the clip library.
+5. **Posts**: download, copy caption, mark as posted + paste the link (views are tracked, and future clips are scored
+   to match what performed).
+6. **Upgrades** when the free clips run out or they want more channels, live recording or campaign rules.
 
-### Why "workspace per tenant" (and not a fork)
+## 3. Screens
 
-The engine is single-tenant by design: every path comes from `CLIPPER_ROOT` (`clipper/config.py`), the state lives
-in one SQLite file per root, streamers come from `config/streamers.json`. Pointing `CLIPPER_ROOT` at a per-tenant
-folder gives each user an isolated, complete engine with **zero changes to the pipeline**. The SaaS layer only:
-
-1. writes the tenant's channels and profile into that folder (`config/streamers.json`, `config/profiles/*.json`),
-2. runs the engine for that folder in a short-lived subprocess when work is due,
-3. reads the tenant's `clipper.db` back (read-only) to list clips, and meters usage.
-
-Every improvement to `clipper/` on `main` lands in the SaaS on the next merge.
-
-### Components
-
-| Part | MVP | Later |
-|---|---|---|
-| Web app | FastAPI + server-rendered pages / one static HTML app (same style as the current dashboard) | Next.js front end if needed |
-| Control DB | SQLite (WAL) via stdlib `sqlite3` | Postgres when a second server is added |
-| Auth | email + password (stdlib `scrypt`), random session token in an HttpOnly cookie, CSRF via SameSite=Lax + same-origin check | magic-link email, Google login, Twitch/YouTube OAuth for "verified owner" |
-| Job queue | `jobs` table + a polling worker (`saas.worker`), N parallel slots = cores / 4 | Redis + RQ/Arq, separate GPU worker pool |
-| Engine run | `python -m saas.run_tenant <id> --mode vod` → sets `CLIPPER_ROOT`, imports `clipper`, runs VOD scan + processes pending candidates, exits | per-tenant long-running live workers (paid tiers) |
-| Whisper + FFmpeg | CPU on the same box (`large-v3-turbo` int8, `X264_PRESET=veryfast`) | GPU worker (RunPod / Modal / Vast) for Whisper + NVENC |
-| Clip storage | local disk, served through an authenticated endpoint | Cloudflare R2 (S3 API, free egress), signed URLs |
-| AI keys | **paid** Gemini API key + **Anthropic API key**, held by the SaaS, never shown to users | per-tenant spend caps, batch API for scoring |
-| Billing | (milestone 3) Polar checkout links + webhook → `plan` / `period_end` on the user | Gumroad adapter as fallback |
-| Email | none in MVP | Resend / Brevo free tier for verification + "clips ready" |
-
-### Live vs VOD
-
-VOD mode (scan the channel's past broadcasts every 30 min after a stream ends, use YouTube Most Replayed, chat
-replay, Twitch viewer clips, audio peaks) is cheap: only the flagged sections are downloaded. **Live mode** records a
-1080p ring buffer for the whole stream (~3 GB/hour ingress, 1 ffmpeg process, CPU for chat parsing) and is what
-makes 24/7 cost grow. So: VOD for every plan, live recording only on Creator/Pro with a cap on concurrent live
-channels per server.
-
-### Engine changes needed (small, upstream-friendly, go to `main` too)
-
-1. `processor/ai.py`: when `ANTHROPIC_API_KEY` is set, call Claude through the official `anthropic` SDK instead of
-   the `claude` CLI. The CLI + personal subscription path stays for self-hosters. Model from `CLAUDE_MODEL`
-   (`sonnet` → `claude-sonnet-5-5`). A personal Claude subscription may not be used to serve paying customers.
-2. `processor/ai.py`: optional `GEMINI_MEDIA_RESOLUTION=low` for the proxy upload (roughly 3x fewer video tokens).
-3. Nothing else: TryPost and `EXPORT_DIR` are already optional (clips stay `ready` with a schedule slot).
-
-## 3. Cost per clip
-
-Assumptions: a candidate excerpt is ~90 s; Gemini rejects ~75% of candidates, so **~4 Gemini verifications per
-finished clip**; Gemini Flash paid input ~$0.375-0.75 per 1M tokens (intro price through 2026-12-31, then higher;
-check ai.google.dev/gemini-api/docs/pricing before launch); video at 1 fps ≈ 290 tokens/s at default resolution,
-~100 tokens/s at low resolution. Claude Sonnet 5.5 is $2 / $10 per 1M tokens.
-
-| Step | Per finished clip |
+| Screen | What's on it |
 |---|---|
-| Gemini verify, 4 × 90 s × 290 tok/s ≈ 105k tokens | $0.04-0.08 (≈ $0.015-0.03 with low resolution) |
-| Gemini scoring (text, ~3k tokens × 2 incl. rejects) | < $0.005 |
-| Claude final check (~2.5k in / 250 out, passing clips only) | ≈ $0.008 |
-| CPU: Whisper (~20 s) + render (~90 s) + downloads, on a $40 8-vCPU box doing ~3,000 clips/month | ≈ $0.013 |
-| R2 storage, 30 MB × 30 days | ≈ $0.0005 |
-| **Total** | **≈ $0.05-0.10** (target ≤ $0.06 with low-res proxies) |
+| **Home / dashboard** | clips used this month (quota bar), channel cards (live now / last scanned / next scan), the latest 6 clips, a "what's happening" line (e.g. "Checking 3 moments from yesterday's stream") |
+| **Clip library** | grid of vertical previews that play on hover/tap; filters: Ready, Scheduled, Posted, Rejected; search by hook/streamer; each card: score, hook, length, **Download**, **Copy caption**, **Mark posted** |
+| **Clip detail** | full player; editable hook, title, caption, hashtags; **Re-render** with the new hook; "Why this was picked" (AI summary + score reason); source link + timestamp; delete |
+| **Schedule** | week view of posting slots (3 a day by default, user's time zone), clips placed in slots, move a clip to another slot, copy caption, download; daily slot times editable |
+| **Channels** | add / pause / remove; per channel: style, VOD scanning on/off, live recording on/off (paid), last result |
+| **Channel style** (per channel) | caption font / size / colour / words per line with live preview, hook banner on/off, layout (auto / facecam stacked / speaker crop / blur), clip length, a **"Picky ↔ More clips"** slider (maps to `min_viral_score`), language; paid: campaign rules, required hashtags, caption suffix |
+| **Activity** | every moment the AI looked at, with the verdict and reason ("rejected: ordinary driving, no reaction"), so users trust it and tune the slider |
+| **Discover** (Creator+) | "find top live streams in my niche" (the engine's auto-discover) with one-click add |
+| **Account & billing** | plan, usage this period, upgrade / downgrade (Polar checkout), invoices (Polar customer portal), delete account |
+| **Admin** (us) | users, plans, clips and AI spend per day, failed jobs + retry, opt-out list, takedown notices |
 
-Live recording adds roughly $0.01-0.02 per stream-hour of CPU and bandwidth on a flat-rate server; it is capped
-per plan rather than metered.
+UI principles: mobile-first (most streamers check on their phone), dark theme matching the current dashboard, every
+action one click, plain words (no "candidates" or "profiles" in the UI), empty states that say what happens next.
+Arabic UI (RTL) after launch, since the engine already supports Arabic captions.
 
-### Fixed monthly costs at launch
+## 4. What maps to the engine
 
-| Item | $/month |
+| Site feature | Engine piece (unchanged) |
 |---|---|
-| Hetzner CCX23 / CPX41 class (8 vCPU, 16-32 GB RAM, 240 GB disk) | 30-45 |
-| Cloudflare (DNS, proxy, R2 first 10 GB free) | 0-2 |
-| Domain (virlo.studio, already owned) | ~1 |
-| Polar | 0 fixed (4% + $0.40 per payment) |
-| **Total** | **≈ $35-50** |
+| Channels, VOD scanning | `ingest/vod.py` (Most Replayed, chat replay, Twitch viewer clips, audio peaks) |
+| Live recording | `ingest/live.py`, `ringbuffer.py`, `spikes.py` |
+| AI picking + scoring | `processor/ai.py` (Gemini verify + score, Claude final check) |
+| Clip rendering | `processor/render.py` (moving crop, facecam stack, payoff zoom, karaoke captions, hook) |
+| Schedule slots | `processor/publish.py` `next_slot` |
+| Duplicates, view learning | `processor/learn.py` |
+| Styles | `config/profiles/*.json` + per-channel overrides |
+| Discover | `ingest/discover.py` |
 
-One box handles ~3,000 clips/month (≈ 40-60 paying users at average use) before a GPU worker is needed.
+**How it's reused without forking:** the engine takes all its paths from `CLIPPER_ROOT`. Each user gets a private
+folder (`saas_data/workspaces/<user>/`) with their own channels, styles and clip database. The site writes the
+user's settings into that folder, runs the engine on it in a separate process when work is due, and reads the
+clips back. Users can never see each other's data, and one user's crash can't affect another.
 
-## 4. Pricing and margins
+Engine changes (small, also go to `main`):
+1. Claude via the **Anthropic API** when `ANTHROPIC_API_KEY` is set (a personal Claude subscription can't serve
+   customers); the CLI path stays for self-hosters.
+2. Optional low-resolution Gemini video input (about 3x cheaper per clip).
+3. A "re-render with a new hook" entry point (for the clip detail screen).
 
-| Plan | Price | Clips / month | Channels | Live recording | Extras |
-|---|---|---|---|---|---|
-| Free trial | $0 | 5 (once) | 1 | no | watermark "made with AutoClipper" |
-| **Starter** | $19 | 30 | 1 | no | VOD mode, all layouts, captions, schedule |
-| **Creator** | $49 | 120 | 3 | 1 live channel | campaign rules, custom profile, Drive export |
-| **Pro** | $99 | 300 | 10 | 3 live channels | priority queue, TryPost auto-posting, API |
+## 5. Plans (cheap, with a real free plan)
 
-Unused clips don't roll over. Overage: $5 per extra 20 clips (Polar one-time product).
-
-| Plan | Revenue | Polar fee | AI + compute (at $0.08/clip, full use) | Gross margin |
+| | **Free** | **Starter** | **Creator** | **Pro** |
 |---|---|---|---|---|
-| Starter | $19 | $1.16 | $2.40 | **81%** |
-| Creator | $49 | $2.36 | $9.60 + ~$3 live | **70%** |
-| Pro | $99 | $4.36 | $24 + ~$8 live | **63%** (typical use ~60% of quota → ~78%) |
+| Price | $0 forever | **$9/mo** | **$19/mo** | **$39/mo** |
+| Clips / month | 10 | 40 | 120 | 300 |
+| Channels | 1 | 2 | 5 | 15 |
+| Live recording | - | - | 1 channel | 3 channels |
+| AI | Gemini only | Gemini + Claude final check | same | same |
+| Queue | standard | fast | fast | priority |
+| Watermark | small "virlo.studio" | none | none | none |
+| Style editor | presets only | full | full | full |
+| Campaign rules, hashtags, caption suffix | - | - | yes | yes |
+| Discover top streams | - | - | yes | yes |
+| Clip history kept | 7 days | 30 days | 60 days | 90 days |
 
-Break-even on the $50 server: **3 Starter users**. "Clip" = a finished, rendered clip; rejected candidates are free
-for the user but count toward a hidden fair-use cap (e.g. 15 candidates per clip of quota) so a dead channel can't
-burn AI spend.
+Yearly billing: 2 months free. Extra clips: $3 per 20.
 
-## 5. Quotas and abuse limits (enforced by the SaaS, not the engine)
+### Why this is sustainable
 
-- Clips per billing period (rendered clips counted from the tenant's `clipper.db`).
-- Candidates per period (AI spend guard) and a global daily AI-spend kill switch (`MAX_DAILY_AI_USD`).
-- Channels per plan, live channels per plan, concurrent jobs per tenant = 1.
-- Max VOD age scanned: 7 days; max VOD windows per stream: from profile (`max_vod_windows`).
-- Disk: tenant workspace capped (raw clips deleted after processing, finished clips moved to R2, 30-day retention).
-- Trial: email verification + 1 trial per email domain/IP block to stop farming.
+Cost per finished clip ≈ **$0.03 free plan** (Gemini Flash-Lite, low-res, no Claude) and **≈ $0.05 paid**
+(Gemini Flash low-res + Claude final check + CPU + storage). "Clip" means a finished clip; the moments the AI
+rejects are free for users but capped behind the scenes so a dead channel can't burn money.
 
-## 6. Legal and copyright stance
+| Plan | Revenue | Polar fee | Cost at full use | Margin at full use | Margin at typical use (~50%) |
+|---|---|---|---|---|---|
+| Free | $0 | - | $0.30 | -$0.30/user | -$0.15/user |
+| Starter | $9 | $0.76 | $2.00 | 69% | 80% |
+| Creator | $19 | $1.16 | $6.00 + live | 55% | 72% |
+| Pro | $39 | $1.96 | $15.00 + live | 45% | 66% |
 
-You chose **"anyone, any channel"**. That is how OpusClip, Vizard and similar tools work (paste any link), and it
-is lawful for the tool itself, but the user is the one publishing, so the terms and the product have to make that
-responsibility explicit. Measures:
+With a ~$40/month server, **5 Starter users cover the server**, and every 10 free users cost about $1.50-3 a
+month, so one $19 Creator pays for ~60 free users. A global daily AI-spend limit protects against surprises.
 
-1. **Terms of Service + Acceptable Use**: the user warrants they own the stream or have the right to clip it
-   (their own channel, written permission, a paid clipping campaign such as Content Rewards, or another basis they
-   are responsible for). Repost farming of a creator who objects is prohibited. Users indemnify the service.
-2. **Rights attestation per channel**: adding a channel requires picking a basis ("my channel", "I have
-   permission", "clipping campaign: link", "other, I take responsibility"); stored with timestamp + IP.
-   "My channel" can later be verified with Twitch/YouTube OAuth for a "verified owner" badge.
-3. **Creator opt-out list**: any streamer can ask (form + email) not to be clipped; their channels are blocked for
-   every tenant (`blocked_channels` table checked when a channel is added and before every engine run).
-4. **DMCA / takedown process**: public `/dmca` page with a designated contact email, a form for notices, removal of
-   the clip within 48 h, notice forwarded to the user, counter-notice path, and a **repeat-infringer policy**
-   (3 valid notices → account terminated). Optionally register a DMCA agent with the US Copyright Office ($6) to
-   strengthen safe-harbor position for US-hosted content.
-5. **Credit by default**: captions credit the streamer (the engine already does this); users can't turn it off on
-   clips of channels they didn't verify as their own.
-6. **No posting on the user's behalf in MVP**: we render and store; the user downloads and posts. TryPost
-   auto-posting comes later, only to the user's own connected accounts.
-7. **Payment-provider risk**: Polar (like every merchant of record) can drop products that facilitate
-   infringement. Before launch, read Polar's acceptable-use policy and describe the product as a clip editor for
-   your own streams and clipping campaigns (which is true). Marketing should lead with own-channel and campaign use,
-   never with "repost big streamers". Keep the Gumroad adapter ready.
-8. **Platform ToS**: downloading with yt-dlp/streamlink is a grey area under YouTube/Twitch terms (the same for
-   every clipper tool). Keep request volume low (VOD sections only, no full downloads), cache, and respect 429s.
-9. **Privacy**: GDPR-style privacy policy (what we store, retention 30 days for clips, deletion on request);
-   Gemini paid tier does not use inputs for training, which also fixes the free-tier caveat in the README.
+## 6. Robustness
 
-*Not legal advice; have the ToS/AUP reviewed once there is revenue.*
+- **Isolation**: one folder + one process per user run; crashes stay contained; the engine already resets stuck
+  jobs on start.
+- **Job queue with retries**: a run is retried up to 3 times with backoff, then shown as "failed" in Activity and in
+  Admin with a retry button. A user only ever has one run at a time.
+- **AI fallbacks**: Gemini model chain (already in the engine) → Claude final check is optional, so an outage
+  degrades quality slightly instead of stopping clips.
+- **Spend guards**: per-user monthly clip and moment caps, a free-plan daily cap, and a global `MAX_DAILY_AI_USD`
+  kill switch.
+- **Quotas checked before work**, not after: no run starts for a user who is out of clips.
+- **Disk hygiene**: raw footage deleted after processing (engine), clips deleted after the plan's history window.
+- **Backups**: nightly copy of the account database + user settings; clips are re-creatable and not backed up.
+- **Health**: `/health` endpoint, failed-job counter, a daily summary email to us.
+- **Tests**: unit tests for quotas, auth and workspace sync; one end-to-end test that runs the engine on a sample
+  file (`process-file`) inside a test workspace.
 
-## 7. MVP scope (milestone 1, this branch)
+## 7. Rights and takedowns (any channel)
 
-In:
-- `saas/` package: control DB (users, sessions, tenants, channels, jobs, usage, blocked_channels), FastAPI app.
-- Signup / login / logout (email + password), per-user tenant + workspace folder.
-- Add / pause / remove a channel (Twitch, Kick, YouTube) with the rights attestation and opt-out check.
-- Worker: for each tenant with active channels, every 30 min run the engine (VOD mode) in a subprocess with
-  `CLIPPER_ROOT=workspaces/<tenant>`; one job per tenant at a time, N global slots.
-- Clips page: the tenant's clips (status, score, hook, caption, schedule slot), authenticated download.
-- Plan field + clip quota check before each run (no payments yet; plans set by an admin command).
-- Engine: Anthropic API backend in `ai.py` (§2).
-- Docs: how to run the SaaS locally (`python -m saas`), env vars, nothing secret in git (`saas.env` ignored).
+- Rights confirmation when adding a channel (stored with time + IP); terms say the user is responsible for what they
+  post.
+- **Creator opt-out**: any streamer can ask not to be clipped; their channel is blocked for everyone.
+- **Takedown page** (`virlo.studio/dmca`): contact + form, clip removed within 48 h, user notified,
+  3 valid notices → account closed.
+- Captions credit the streamer by default; no auto-posting to social accounts at launch (users post themselves).
+- Marketing leads with "clip your streams" and paid clipping campaigns, which also keeps Polar comfortable.
+- Privacy policy; the paid Gemini tier doesn't train on inputs.
 
-Out (later milestones): payments, R2, live mode, email, OAuth verification, admin UI, auto-posting.
+*Not legal advice; have the terms reviewed once there's revenue.*
 
-## 8. Milestones
+## 8. Tech and hosting (short)
+
+- **App**: FastAPI (same as the engine) + server-rendered pages with HTMX and Tailwind: fast, works on phones, no
+  front-end build step. JSON API underneath for a future mobile app.
+- **Data**: SQLite for accounts (Postgres later if needed); each user's clip database is the engine's own.
+- **Auth**: email + password (stdlib `scrypt`), secure session cookie; Google sign-in later.
+- **Workers**: a scheduler picks users with work due and runs the engine; parallel runs = CPU cores / 4.
+- **Hosting**: one ~$40/month 8-vCPU server behind Cloudflare (free TLS) at launch; clips on Cloudflare R2
+  later. A GPU worker only once revenue covers it.
+- **Secrets**: never in git (the repo is public). Paid Gemini key, Anthropic key, Polar keys, session secret live in
+  `saas.env` (gitignored); `saas.env.example` is committed. User data lives in `saas_data/` (gitignored). Your local
+  AutoClipper (`.env`, `data/`, `config/streamers.json`) is untouched.
+
+## 9. Milestones
 
 | # | Milestone | Done when |
 |---|---|---|
-| M1 | **MVP skeleton** (this branch) | two test users each add a channel and see only their own clips, produced by the unchanged engine |
-| M2 | Deploy + storage | runs on the Hetzner box behind Cloudflare; clips on R2 with signed URLs; backups of `saas.db` |
-| M3 | Billing | Polar products for 3 tiers + overage; webhook sets plan/period; quota resets per period; trial |
-| M4 | Legal + trust | ToS, AUP, privacy, `/dmca` page + notice form, opt-out form, repeat-infringer counter |
-| M5 | Live mode | per-tenant live workers for Creator/Pro, concurrency caps, live status in the dashboard |
-| M6 | Growth | landing page, onboarding emails, referral codes, verified-owner OAuth, TryPost auto-posting |
-| M7 | Scale | Postgres, Redis queue, GPU worker pool, second box |
+| **M1** | **Working app (this branch)** | sign up, onboarding wizard, add channel, engine runs per user, dashboard + clip library + clip detail + channels + activity work locally; two test users see only their own clips |
+| M2 | Plans + payments | Free/Starter/Creator/Pro limits enforced; Polar checkout + webhook; usage bar; watermark on free |
+| M3 | Schedule + style editor | week view, slot editing, caption style live preview, re-render with new hook |
+| M4 | Launch | landing page + pricing on virlo.studio, terms/privacy/takedown pages, server live, R2, backups, admin page |
+| M5 | Live + Discover | live recording for Creator/Pro, discover screen |
+| M6 | Growth | Google sign-in, notifications, referral codes, Arabic UI, verified-owner badge, auto-posting |
 
-Rough effort: M1 2-3 days, M2 1 day, M3 1-2 days, M4 1 day, M5 2 days.
+## 10. Open questions
 
-## 9. Secrets and the public repo
-
-- The repo goes public: **no keys in git**. SaaS secrets live in `saas.env` (gitignored) or the server's env:
-  `GEMINI_API_KEY` (paid project), `ANTHROPIC_API_KEY`, `POLAR_ACCESS_TOKEN`, `POLAR_WEBHOOK_SECRET`,
-  `SESSION_SECRET`, R2 keys. A `saas.env.example` with empty values is committed.
-- Tenant workspaces and `saas.db` live under `saas_data/` (gitignored), never in `data/`.
-- Your local setup (`.env`, `data/`, `config/streamers.json`) is not touched by anything on this branch.
-
-## 10. Open questions for later
-
-- Product name on virlo.studio: "Virlo Studio" (clipper as part of Virlo) or keep "AutoClipper Cloud" as the name.
-- Whether the open-source README's "Hosted version: waitlist" link should point to the landing page at M2.
-- Trial watermark: yes/no.
+- Product name: "Virlo Studio" for everything, or "AutoClipper by Virlo"?
+- Free-plan watermark: yes (helps growth) or no?
