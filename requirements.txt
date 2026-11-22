@@ -8,5 +8,4 @@ google-genai>=3.6.1
 faster-whisper==1.1.1
 yt-dlp>=2025.1.15
 streamlink>=7.1.2
-chat-downloader==0.2.8
 tzdata>=2024.1
