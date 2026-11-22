@@ -33,6 +33,8 @@ for _d in (STATE_DIR, RING_DIR, CANDIDATES_DIR, READY_DIR, WORK_DIR, PROFILES_DI
 
 DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8090"))
 VOD_POLL_MINUTES = int(os.getenv("VOD_POLL_MINUTES", "30"))
+# off = never record live streams (saves ~6-8 Mbps per stream); clips come only from finished streams
+LIVE_RECORDING = os.getenv("LIVE_RECORDING", "on").strip().lower() not in ("off", "0", "false", "no")
 KEEP_PUBLISHED_DAYS = int(os.getenv("KEEP_PUBLISHED_DAYS", "7"))
 
 DEFAULT_PROFILE: dict = {

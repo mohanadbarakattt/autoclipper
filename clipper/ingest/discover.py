@@ -16,7 +16,7 @@ import os
 import httpx
 
 from .. import db
-from ..config import list_profiles, load_profile, load_streamers, save_streamers
+from ..config import LIVE_RECORDING, list_profiles, load_profile, load_streamers, save_streamers
 from ..media import ytdlp_json
 from . import platforms
 
@@ -108,7 +108,7 @@ def run_once() -> None:
         sid = f"{v['platform']}:{v['channel'].lower()}"
         if sid not in have:
             new_list.append({"platform": v["platform"], "channel": v["channel"], "profile": v["profile"],
-                             "live": True, "vods": False, "paused": False, "auto": True})
+                             "live": True, "vods": not LIVE_RECORDING, "paused": False, "auto": True})
             added.append(f"{sid} ({v['viewers']:,})")
     if added or removed:
         save_streamers(new_list)

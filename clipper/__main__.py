@@ -12,7 +12,7 @@ from pathlib import Path
 import uvicorn
 
 from . import db
-from .config import (CANDIDATES_DIR, DASHBOARD_PORT, KEEP_PUBLISHED_DAYS, READY_DIR, VOD_POLL_MINUTES, WORK_DIR,
+from .config import (LIVE_RECORDING, CANDIDATES_DIR, DASHBOARD_PORT, KEEP_PUBLISHED_DAYS, READY_DIR, VOD_POLL_MINUTES, WORK_DIR,
                      load_streamers)
 from .dashboard.app import EVENTS, app
 from .ingest import vod
@@ -29,7 +29,7 @@ for _noisy in ("httpx", "httpx2", "google_genai", "google_genai.models"):
 async def live_supervisor() -> None:
     workers: dict[str, tuple[LiveWorker, asyncio.Task]] = {}
     while True:
-        wanted = {s["id"]: s for s in load_streamers() if s.get("live", True)}
+        wanted = {s["id"]: s for s in load_streamers() if s.get("live", True)} if LIVE_RECORDING else {}
         for sid, s in wanted.items():
             if sid not in workers or workers[sid][1].done():
                 w = LiveWorker(s)
@@ -71,9 +71,18 @@ def cleanup() -> None:
     for r in db.q("SELECT id, out_path FROM candidates WHERE status IN ('scheduled','drafted','posted') AND updated_at < ?", (cutoff,)):
         if r["out_path"]:
             Path(r["out_path"]).unlink(missing_ok=True)
-    for r in db.q("SELECT raw_path FROM candidates WHERE status IN ('rejected','failed') AND updated_at < ?", (time.time() - 86400,)):
-        if r["raw_path"]:
-            Path(r["raw_path"]).unlink(missing_ok=True)
+    for r in db.q("SELECT raw_path, out_path FROM candidates WHERE status IN ('rejected','failed') AND updated_at < ?",
+                  (time.time() - 86400,)):
+        for p in (r["raw_path"], r["out_path"]):
+            if p:
+                Path(p).unlink(missing_ok=True)
+                Path(p).with_suffix(".jpg").unlink(missing_ok=True)
+    # recording buffers of streams that ended (a live buffer is rewritten every 30 s)
+    from .config import RING_DIR
+    for d in RING_DIR.iterdir():
+        files = list(d.glob("*")) if d.is_dir() else []
+        if time.time() - max((f.stat().st_mtime for f in files), default=0) > 1800:
+            shutil.rmtree(d, ignore_errors=True)
     for d in WORK_DIR.iterdir():
         if d.stat().st_mtime < time.time() - 86400:
             shutil.rmtree(d, ignore_errors=True) if d.is_dir() else d.unlink(missing_ok=True)
@@ -87,13 +96,16 @@ def cleanup() -> None:
 
 async def cleanup_loop() -> None:
     from .processor import learn
+    n = 0
     while True:
-        await asyncio.to_thread(cleanup)
-        try:
-            await asyncio.to_thread(learn.refresh_views)
-        except Exception:
-            log.exception("view refresh failed")
-        await asyncio.sleep(6 * 3600)
+        await asyncio.to_thread(cleanup)  # hourly: dead recording buffers add up fast
+        if n % 6 == 0:  # view counts every 6 hours
+            try:
+                await asyncio.to_thread(learn.refresh_views)
+            except Exception:
+                log.exception("view refresh failed")
+        n += 1
+        await asyncio.sleep(3600)
 
 
 async def discover_loop() -> None:
