@@ -24,7 +24,8 @@
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-get-paid-per-view">Get paid</a> ·
   <a href="#%EF%B8%8F-settings">Settings</a> ·
-  <a href="#-faq">FAQ</a>
+  <a href="#-faq">FAQ</a> ·
+  <a href="DONATE.md">Donate</a>
 </p>
 
 ---
@@ -193,7 +194,40 @@ model and retries, so you don't need to do anything.
 
 ## ❤️ Support the project
 
-AutoClipper is free and open source. The best ways to help:
+AutoClipper is free and open source. If it makes you money, a tip keeps it going:
+click an address's 📋 copy button, or [scan a QR code](DONATE.md).
+
+<table><tr>
+<td><b>BTC</b> <sub>(Bitcoin)</sub></td>
+<td>
+
+```text
+bc1p4h0mpf66yf3tf64auhz5hu0l22jagvfzsja6zz4qy63xcevgx6gs6qrf9h
+```
+</td></tr><tr>
+<td><b>USDT</b> <sub>(Tron TRC-20 only)</sub></td>
+<td>
+
+```text
+TQbzWvdvLoruNr4drYZXZNCQbrcK6CvV99
+```
+</td></tr><tr>
+<td><b>SOL</b> <sub>(Solana)</sub></td>
+<td>
+
+```text
+DZybEbVkahQq4L2zHx2Vs4jag9Has7TVs7i9BgY59CW5
+```
+</td></tr><tr>
+<td><b>ETH</b> <sub>(Ethereum mainnet)</sub></td>
+<td>
+
+```text
+0xA086baC43bD8fE83c8A97043eEca959DfD426AA6
+```
+</td></tr></table>
+
+Other ways to help:
 
 - ⭐ **Star the repo** so other clippers can find it.
 - 🐛 **Report bugs** and share what worked in [Issues](https://github.com/mohanadbarakattt/autoclipper/issues).
