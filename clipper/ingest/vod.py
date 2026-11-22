@@ -75,6 +75,31 @@ def twitch_clip_windows(s: dict, info: dict, profile: dict) -> list[tuple[float,
     return _merge(wins, info.get("duration") or 0, d["min"], d["max"])
 
 
+def chat_messages(line: str) -> list[tuple[float | None, str]]:
+    """(video seconds or None, text) for every chat message in one line of yt-dlp's live_chat JSON.
+    Live captures and replays use the same format; one line can hold several messages."""
+    import json
+    try:
+        d = json.loads(line)
+    except (ValueError, json.JSONDecodeError):
+        return []
+    a = d.get("replayChatItemAction") or d
+    try:
+        t = int(a["videoOffsetTimeMsec"]) / 1000 if "videoOffsetTimeMsec" in a else None
+    except (TypeError, ValueError):
+        t = None
+    out = []
+    for act in a.get("actions") or []:
+        r = ((act.get("addChatItemAction") or {}).get("item") or {}).get("liveChatTextMessageRenderer")
+        if not r:
+            continue
+        text = "".join(x.get("text") or ((x.get("emoji") or {}).get("shortcuts") or [""])[0]
+                       for x in (r.get("message") or {}).get("runs", []))
+        if text.strip():
+            out.append((t, text))
+    return out
+
+
 def chat_replay_windows(url: str, key: str, profile: dict, duration: float) -> list[tuple[float, float, float]]:
     """YouTube keeps the full live chat with video timestamps: score it in 10 s buckets with the same
     reaction scoring as live (spam damped) and return the biggest spikes vs. the local baseline."""
@@ -98,21 +123,16 @@ def chat_replay_windows(url: str, key: str, profile: dict, duration: float) -> l
         seen: dict[int, dict[str, int]] = {}
         with open(files[0], encoding="utf-8") as fh:
             for line in fh:
-                try:
-                    a = json.loads(line)["replayChatItemAction"]
-                    t = int(a["videoOffsetTimeMsec"]) / 1000
-                    r = a["actions"][0]["addChatItemAction"]["item"]["liveChatTextMessageRenderer"]
-                except (KeyError, ValueError, IndexError, json.JSONDecodeError):
-                    continue
-                text = "".join(x.get("text") or ((x.get("emoji") or {}).get("shortcuts") or [""])[0]
-                               for x in r.get("message", {}).get("runs", []))
-                b = int(t // bucket)
-                if b >= len(scores):
-                    continue
-                k = text.lower().strip()[:60]
-                n = seen.setdefault(b, {}).get(k, 0) + 1
-                seen[b][k] = n
-                scores[b] += score_message(text, profile) * (0.05 if n > 2 else 1.0)
+                for t, text in chat_messages(line):
+                    if t is None:
+                        continue
+                    b = int(t // bucket)
+                    if b >= len(scores):
+                        continue
+                    k = text.lower().strip()[:60]
+                    n = seen.setdefault(b, {}).get(k, 0) + 1
+                    seen[b][k] = n
+                    scores[b] += score_message(text, profile) * (0.05 if n > 2 else 1.0)
         if scores.sum() == 0:
             return []
         # a peak must be in the stream's top 2% of buckets AND well above the surrounding 10 minutes

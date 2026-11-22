@@ -169,16 +169,48 @@ class LiveWorker:
         stop = threading.Event()
 
         def pump() -> None:
-            from chat_downloader import ChatDownloader
+            """yt-dlp keeps writing the live chat to a .part file while the stream is live; we tail it.
+            (chat-downloader broke when YouTube changed its page; yt-dlp is maintained and already installed.)"""
+            import shutil
+            import subprocess
+            from ..config import WORK_DIR
+            from ..media import YTDLP
+            from .vod import chat_messages
+            tmp = WORK_DIR / f"livechat_{self.sid.replace(':', '_')}"
             while not stop.is_set():
+                shutil.rmtree(tmp, ignore_errors=True)
+                tmp.mkdir(parents=True, exist_ok=True)
+                proc = subprocess.Popen([*YTDLP, "--no-warnings", "--quiet", "--skip-download", "--write-subs",
+                                         "--sub-langs", "live_chat", "-o", str(tmp / "c"), url],
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                pos, buf, warned = 0, "", False
                 try:
-                    for m in ChatDownloader().get_chat(url, message_types=["text_message"]):
-                        if stop.is_set():
-                            return
-                        loop.call_soon_threadsafe(self.det.add, score_message(m.get("message") or "", profile), m.get("message") or "")
-                except Exception as e:
-                    log.warning("youtube chat %s: %s", self.sid, e)
-                stop.wait(15)
+                    while not stop.is_set() and proc.poll() is None:
+                        stop.wait(2)
+                        f = next(iter(tmp.glob("c.live_chat.json.part")), None)
+                        if not f:
+                            continue
+                        with open(f, "rb") as fh:
+                            fh.seek(pos)
+                            chunk = fh.read()
+                            pos += len(chunk)
+                        buf += chunk.decode("utf-8", "ignore")
+                        *lines, buf = buf.split("\n")
+                        for line in lines:
+                            for _, text in chat_messages(line):
+                                loop.call_soon_threadsafe(self.det.add, score_message(text, profile), text)
+                    if proc.poll() is not None and not stop.is_set() and not warned:
+                        log.info("youtube chat %s: chat feed ended - reconnecting", self.sid)
+                        warned = True
+                finally:
+                    if proc.poll() is None:
+                        proc.terminate()
+                        try:
+                            proc.wait(10)
+                        except subprocess.TimeoutExpired:
+                            proc.kill()
+                stop.wait(20)
+            shutil.rmtree(tmp, ignore_errors=True)
 
         th = threading.Thread(target=pump, daemon=True)
         th.start()

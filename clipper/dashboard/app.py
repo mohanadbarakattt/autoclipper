@@ -200,8 +200,57 @@ class PostedIn(BaseModel):
 def mark_posted(cid: int, body: PostedIn | None = None):
     """Mark posted; optional link(s) to the live post(s) so views can be tracked and learned from."""
     url = (body.url if body else "").strip()
-    db.update_candidate(cid, status="posted", posted_at=time.time(), **({"post_url": url} if url else {}))
-    return {"ok": True}
+    cur = db.q("SELECT post_url, posted_at FROM candidates WHERE id=?", (cid,))
+    if not cur:
+        raise HTTPException(404)
+    links = (cur[0]["post_url"] or "").split()
+    links += [u for u in url.split() if u not in links]  # posting to another platform adds a link
+    db.update_candidate(cid, status="posted", posted_at=cur[0]["posted_at"] or time.time(),
+                        **({"post_url": " ".join(links)} if links else {}))
+    return {"ok": True, "links": links}
+
+
+_PLATFORM_HOSTS = {"youtube": ("youtube.com", "youtu.be"), "tiktok": ("tiktok.com",), "instagram": ("instagram.com",)}
+
+
+@app.get("/api/posting-queue")
+def posting_queue(platform: str = "youtube", limit: int = 3):
+    """Ready-to-upload clips for an agent (Grokbot, OpenBot, ...) or a script: absolute file path, title,
+    description and the scheduled time, best slot first. Clips already posted on `platform` are skipped.
+    After uploading, POST /api/clips/{id}/posted {"url": "<link to the post>"}."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    hosts = _PLATFORM_HOSTS.get(platform.lower(), (platform.lower(),))
+    rows = db.q("SELECT id, streamer_id, viral_score, hook, title, caption, score_json, out_path, scheduled_at, post_url "
+                "FROM candidates WHERE out_path IS NOT NULL AND status IN ('ready','scheduled','drafted','posted') "
+                "ORDER BY scheduled_at IS NULL, scheduled_at")
+    out = []
+    for r in rows:
+        if any(h in (r["post_url"] or "") for h in hosts) or not Path(r["out_path"]).exists():
+            continue
+        score = json.loads(r["score_json"] or "{}")
+        tags = [t.lstrip("#").replace(" ", "") for t in score.get("hashtags", [])][:5]
+        title = (r["title"] or r["hook"] or "Stream highlight").replace("<", "").replace(">", "")[:95]
+        if platform.lower() == "youtube" and "#shorts" not in title.lower() and len(title) <= 90:
+            title += " #Shorts"
+        when = datetime.fromisoformat(r["scheduled_at"]) if r["scheduled_at"] else datetime.now(timezone.utc)
+        when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+        local = when.astimezone()  # this PC's timezone = what YouTube Studio's scheduler shows in its browser
+        out.append({
+            "id": r["id"], "file": str(Path(r["out_path"]).resolve()), "streamer": r["streamer_id"],
+            "score": r["viral_score"], "title": title,
+            "description": f"{(r['caption'] or '').strip()}\n\n" + " ".join("#" + t for t in tags),
+            "hashtags": tags,
+            "post_at_utc": when.isoformat(),
+            "post_at_local": {"date": local.strftime("%Y-%m-%d"), "time": local.strftime("%H:%M"),
+                              "pretty": local.strftime("%a %d %b %Y, %I:%M %p")},
+            "post_at_new_york": when.astimezone(ZoneInfo("America/New_York")).strftime("%a %d %b %I:%M %p ET"),
+            "in_past": when < datetime.now(timezone.utc),
+            "mark_posted": f"POST /api/clips/{r['id']}/posted  body: {{\"url\": \"<link to the {platform} post>\"}}",
+        })
+        if len(out) >= max(1, min(limit, 20)):
+            break
+    return {"platform": platform, "count": len(out), "items": out}
 
 
 @app.post("/api/refresh-views")
