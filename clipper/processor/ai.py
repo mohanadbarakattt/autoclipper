@@ -103,6 +103,8 @@ def _gen(contents, config):
                 continue  # was busy recently: don't wait on it again
             for attempt in range(2 if last else 1):  # busy primary -> straight to the next model
                 try:
+                    from .. import guard
+                    guard.add("gemini")  # every request counts toward the daily budget, answered or not
                     resp = _gemini().models.generate_content(model=model, contents=contents, config=config)
                     if model != last_model:
                         log.info("Gemini answering with %s", model)
@@ -195,6 +197,8 @@ def claude_json(prompt: str, timeout: int = 240) -> dict:
     env = dict(os.environ)
     if not env.get("CLAUDE_CODE_OAUTH_TOKEN"):
         env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)  # empty value would override the normal `claude` login
+    from .. import guard
+    guard.add("claude")
     with tempfile.TemporaryDirectory() as cwd:  # empty dir: nothing for it to touch
         p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=timeout, cwd=cwd, env=env)
@@ -210,7 +214,8 @@ _claude_off_until = 0.0
 
 
 def _claude_available() -> bool:
-    return bool(claude_bin()) and time.time() > _claude_off_until
+    from .. import guard
+    return bool(claude_bin()) and time.time() > _claude_off_until and guard.ok("claude")
 
 
 def score_clip(transcript: str, verdict: dict, profile: dict, platform: str, streamer: str,

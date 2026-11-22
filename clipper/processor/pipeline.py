@@ -110,6 +110,8 @@ def process(cand: dict) -> None:
         out = READY_DIR / f"clip_{cid}.mp4"
         render.render_vertical(clip, out, work, words, score["top_banner_hook"], rv, profile)
         db.update_candidate(cid, status="ready", out_path=str(out))
+        from .. import guard
+        guard.add("clips")
         raw.unlink(missing_ok=True)
 
         # 6. TryPost / schedule
@@ -154,6 +156,9 @@ def publish_candidate(cid: int) -> None:
 
 
 def run_once() -> bool:
+    from .. import guard
+    if not guard.can_process():
+        return False  # daily clip / AI budget used up: the queue waits until tomorrow
     cand = db.claim_next_pending()
     if not cand:
         return False

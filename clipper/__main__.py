@@ -90,6 +90,8 @@ def cleanup() -> None:
     for f in CANDIDATES_DIR.glob("*.mp4"):
         if str(f) not in referenced and f.stat().st_mtime < time.time() - 3 * 86400:
             f.unlink(missing_ok=True)
+    from . import guard
+    guard.enforce_storage()  # over MAX_STORAGE_GB / under MIN_FREE_DISK_GB: free space in a safe order
     free = shutil.disk_usage(READY_DIR).free / 1e9
     log.info("cleanup done, %.1f GB free", free)
 

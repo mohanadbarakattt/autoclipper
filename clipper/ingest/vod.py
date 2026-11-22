@@ -11,7 +11,7 @@ import shutil
 import time
 from datetime import datetime, timedelta, timezone
 
-from .. import db
+from .. import db, guard
 from ..config import CANDIDATES_DIR, WORK_DIR, load_profile, load_streamers
 from ..media import loud_windows, loudness_per_second, ytdlp_audio, ytdlp_json, ytdlp_section
 from . import platforms
@@ -116,6 +116,8 @@ def chat_replay_windows(url: str, key: str, profile: dict, duration: float) -> l
         run([*YTDLP, "--no-warnings", "--skip-download", "--write-subs", "--sub-langs", "live_chat",
              "-o", str(tmp / "c"), url], timeout=3600, check=False)
         files = list(tmp.glob("c*.live_chat.json"))
+        for f in files:
+            guard.add_download(f)
         if not files:
             return []
         bucket = 10
@@ -162,6 +164,7 @@ def audio_windows(url: str, key: str, profile: dict) -> list[tuple[float, float,
     tmp.mkdir(parents=True, exist_ok=True)
     try:
         audio = ytdlp_audio(url, tmp / "a")
+        guard.add_download(audio)
         if not audio:
             return []
         arr = loudness_per_second(audio)
@@ -175,6 +178,8 @@ def process_vod(s: dict, entry: dict) -> None:
     key = f"{s['platform']}:{entry['id']}"
     if db.vod_seen(key):
         return
+    if not guard.can_add_candidate():
+        return  # daily download budget / storage / queue limit: not marked seen, so it's retried later
     url = entry.get("url") or entry.get("webpage_url")
     if s["platform"] == "twitch" and url and not url.startswith("http"):
         url = f"https://www.twitch.tv/videos/{str(entry['id']).lstrip('v')}"
@@ -213,8 +218,12 @@ def process_vod(s: dict, entry: dict) -> None:
     log.info("%s: %d peak windows via %s", key, len(wins), method)
     for i, (st, en, val) in enumerate(wins):
         out = CANDIDATES_DIR / f"{key.replace(':', '_')}_{int(st)}.mp4"
+        if not guard.can_add_candidate():
+            log.info("%s: limits reached - keeping the %d best of %d peaks", key, i, len(wins))
+            break
         try:
             ytdlp_section(url, st, en, out)
+            guard.add_download(out)
             db.add_candidate(s, "vod", url, str(out), f"{method} ({val:.2f})", source_offset=st)
         except Exception as e:
             log.warning("section download failed %s @%s: %s", key, st, e)

@@ -45,6 +45,9 @@ class LiveWorker:
             profile = load_profile(s["profile"])
             info = await asyncio.to_thread(platforms.live_info, s)
             want = info["live"] and platforms.matches_filter(info, profile)
+            if want and not self.rec.running:
+                from .. import guard
+                want = guard.ok("download_gb") and guard.storage_ok()  # don't start new recordings over budget
             if want and not self.rec.running and s.get("auto") and len(RECORDING) >= MAX_RECORDINGS:
                 want = False  # laptop at capacity: auto-found channels wait, your own channels always record
             db.upsert_status(self.sid, platform=s["platform"], channel=s["channel"], is_live=int(info["live"]),
@@ -123,8 +126,12 @@ class LiveWorker:
 
     async def _cut(self, ts: float, reason: str, profile: dict) -> None:
         name = f"{self.sid.replace(':', '_')}_{int(ts)}"
+        from .. import guard
+        if not guard.can_add_candidate():
+            return  # queue full / storage or daily download limit reached
         out = await self.rec.extract(ts, profile["window_before_sec"], profile["window_after_sec"], name)
         if out:
+            guard.add_download(out)
             db.add_candidate(self.s, "live", platforms.stream_url(self.s), str(out), reason)
 
     async def _twitch_irc(self, profile: dict) -> None:

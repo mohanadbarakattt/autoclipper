@@ -64,6 +64,25 @@
     </div>
   </section>
 
+  <section class="card p-4 space-y-3" x-show="guard.clips">
+    <div class="flex items-center justify-between">
+      <h2 class="font-bold">Today's limits</h2>
+      <span class="text-xs" :class="guard.paused?.length ? 'text-amber-300' : 'text-slate-400'"
+            x-text="guard.paused?.length ? 'Paused: ' + guard.paused.join(', ') + ' (resets at midnight or raise it in .env)' : 'Change these in .env (MAX_...)'"></span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <template x-for="k in ['clips','gemini','claude','download_gb','storage','free_disk','pending']" :key="k">
+        <div x-show="guard[k]">
+          <div class="flex justify-between text-xs text-slate-400"><span x-text="guard[k]?.label"></span>
+            <span x-text="`${guard[k]?.used}${guard[k]?.unit?' '+guard[k].unit:''} / ${guard[k]?.limit||'∞'}`"></span></div>
+          <div class="h-1.5 bg-slate-800 rounded mt-1"><div class="h-1.5 rounded"
+            :class="guard[k]?.min ? (guard[k].used < guard[k].limit ? 'bg-red-500' : 'bg-emerald-500') : (guard[k]?.limit && guard[k].used >= guard[k].limit ? 'bg-amber-400' : 'bg-indigo-500')"
+            :style="`width:${guard[k]?.min ? 100 : Math.min(100, guard[k]?.limit ? guard[k].used / guard[k].limit * 100 : 0)}%`"></div></div>
+        </div>
+      </template>
+    </div>
+  </section>
+
   <section class="card p-4 space-y-3">
     <div class="flex items-center justify-between">
       <h2 class="font-bold">Posting schedule</h2>
@@ -128,7 +147,7 @@
 </div>
 <script>
 function app(){return{
-  ov:{},health:{},streams:[],clips:[],sched:[],
+  ov:{},health:{},streams:[],clips:[],sched:[],guard:{},
   fmt(iso,tz){return new Date(iso).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit',...(tz?{timeZone:tz}:{})})},profiles:{},filter:'',form:{platform:'twitch',channel:'',profile:'gaming'},
   kpis(){return[['Recording now',this.ov.live_recording],['Clips (24h)',this.ov.clips_today],['Avg score (24h)',this.ov.avg_score_24h],['In queue',this.ov.queue],['Data on disk',(this.ov.data_gb??0)+' GB']]},
   async j(u,o){const r=await fetch(u,o);if(!r.ok){alert((await r.text()).slice(0,300));throw r}return r.json()},
@@ -143,7 +162,7 @@ function app(){return{
   },
   async addStreamer(){await this.post('/api/streamers',this.form);this.form.channel=''},
   async load(){
-    [this.ov,this.streams,this.clips,this.sched]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:'')),this.j('/api/schedule')]);
+    [this.ov,this.streams,this.clips,this.sched,this.guard]=await Promise.all([this.j('/api/overview'),this.j('/api/streams'),this.j('/api/clips?limit=60'+(this.filter?'&status='+this.filter:'')),this.j('/api/schedule'),this.j('/api/guardrails')]);
   },
   async init(){this.profiles=await this.j('/api/profiles');this.health=await this.j('/api/health');this.load();
     setInterval(()=>this.j('/api/streams').then(s=>this.streams=s),3000);

@@ -253,6 +253,13 @@ def posting_queue(platform: str = "youtube", limit: int = 3):
     return {"platform": platform, "count": len(out), "items": out}
 
 
+@app.get("/api/guardrails")
+def guardrails():
+    """Today's usage vs. the daily limits (MAX_* settings in .env)."""
+    from .. import guard
+    return guard.status()
+
+
 @app.post("/api/refresh-views")
 def refresh_views():
     from ..processor import learn
