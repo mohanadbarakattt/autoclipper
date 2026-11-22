@@ -6,7 +6,7 @@ Every limit is a .env setting (0 = no limit). Usage resets at midnight (this PC'
     MAX_CLIPS_PER_DAY=15            finished clips kept per day; when reached, the queue waits until tomorrow
     MAX_AI_CHECKS_PER_DAY=200       Gemini calls per day (free tier allows a few hundred)
     MAX_CLAUDE_CHECKS_PER_DAY=25    Claude final checks per day (protects your plan's limit)
-    MAX_DOWNLOAD_GB_PER_DAY=8       video/audio downloaded per day
+    MAX_DOWNLOAD_GB_PER_DAY=2       video/audio downloaded per day
     MAX_STORAGE_GB=20               size of the data folder; over it, old files are cleaned and new work pauses
     MIN_FREE_DISK_GB=15             always leave this much free on the disk
     MAX_PENDING=40                  candidates waiting in the queue; extra ones are skipped
@@ -28,7 +28,7 @@ LIMITS = {  # key: (env var, default, label, unit)
     "clips": ("MAX_CLIPS_PER_DAY", 15, "Clips kept", ""),
     "gemini": ("MAX_AI_CHECKS_PER_DAY", 200, "Gemini calls", ""),
     "claude": ("MAX_CLAUDE_CHECKS_PER_DAY", 25, "Claude checks", ""),
-    "download_gb": ("MAX_DOWNLOAD_GB_PER_DAY", 8, "Downloaded", "GB"),
+    "download_gb": ("MAX_DOWNLOAD_GB_PER_DAY", 2, "Downloaded", "GB"),
 }
 _warned: dict[str, str] = {}
 
