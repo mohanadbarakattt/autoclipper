@@ -1,0 +1,25 @@
+# Virlo Clips service behind Caddy: automatic HTTPS (Let's Encrypt) for {{DOMAIN}}.
+# Only the service API, signed media links and health are exposed.
+{{DOMAIN}} {
+	encode gzip
+	@allowed path /v1/* /media/* /health
+	handle @allowed {
+		reverse_proxy 127.0.0.1:8101 {
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+	handle {
+		respond "Not found" 404
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+	log {
+		output file /var/log/caddy/virlo-clips.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

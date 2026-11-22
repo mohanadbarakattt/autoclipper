@@ -1,0 +1,30 @@
+[Unit]
+Description=Virlo Clips worker (scans channels, runs the clipping engine per user)
+After=network-online.target virlo-clips-web.service
+Wants=network-online.target
+
+[Service]
+User=virlo
+Group=virlo
+WorkingDirectory=/opt/virlo-clips
+ExecStart=/opt/virlo-clips/.venv/bin/python -m saas worker
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+# Whisper model cache lives with the data, not in $HOME
+Environment=HF_HOME=/var/lib/virlo-clips/cache/hf
+# yt-dlp / streamlink caches (home dirs are hidden by ProtectHome)
+Environment=HOME=/var/lib/virlo-clips
+Environment=XDG_CACHE_HOME=/var/lib/virlo-clips/cache
+# leave CPU for the API when a render is running
+Nice=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/virlo-clips /opt/virlo-clips
+# a run can take a while; give in-flight jobs time to finish on restart
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

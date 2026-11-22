@@ -1,0 +1,22 @@
+[Unit]
+Description=Virlo Clips service API (/v1 + signed media)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=virlo
+Group=virlo
+WorkingDirectory=/opt/virlo-clips
+ExecStart=/opt/virlo-clips/.venv/bin/python -m saas web
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+# hardening: the app only writes to its data dir
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/virlo-clips /opt/virlo-clips
+
+[Install]
+WantedBy=multi-user.target

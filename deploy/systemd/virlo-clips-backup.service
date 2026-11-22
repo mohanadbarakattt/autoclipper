@@ -1,0 +1,8 @@
+[Unit]
+Description=Virlo Clips nightly backup (accounts DB + per-user settings)
+
+[Service]
+Type=oneshot
+User=virlo
+Group=virlo
+ExecStart=/usr/local/bin/virlo-clips-backup

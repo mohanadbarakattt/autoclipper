@@ -1,0 +1,3 @@
+# shell scripts and server configs must keep LF line endings
+*.sh text eol=lf
+deploy/** text eol=lf
