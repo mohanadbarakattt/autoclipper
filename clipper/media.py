@@ -80,7 +80,10 @@ def loud_windows(db: np.ndarray, window: int = 75, top_n: int = 5, min_gap: int 
     voiced = db[db > -55.0]
     if len(voiced) < window:
         return []
-    z = (db - np.median(voiced)) / (np.std(voiced) + 1e-6)
+    # robust spread (MAD): quiet chatting / breaks must not make every hype moment look ordinary
+    mid = np.median(voiced)
+    spread = 1.4826 * np.median(np.abs(voiced - mid))
+    z = (db - mid) / (spread + 1e-6)
     short = np.convolve(z, np.ones(8) / 8, mode="same")  # 8 s bursts (laughs, screams, hype)
     order = np.argsort(short)[::-1]
     picks: list[tuple[int, int, float]] = []
