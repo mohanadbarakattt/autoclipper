@@ -42,7 +42,12 @@ def probe(path: str | Path) -> dict:
 
 def make_proxy(src: Path, dst: Path) -> Path:
     """480p, 1 fps, low-bitrate mono audio: what Gemini actually samples, at a fraction of the upload."""
-    run([FFMPEG, "-y", "-v", "error", "-i", src, "-vf", "scale=-2:480,fps=1",
+    # a burned-in seconds counter: Gemini reads it instead of guessing timestamps (it used to drift past the end)
+    from .config import FONTS_DIR
+    font = next((f for f in sorted(FONTS_DIR.glob("*.ttf"))), None) if FONTS_DIR.exists() else None
+    clock = (f",drawtext=fontfile='{font.as_posix().replace(':', chr(92) + ':')}':text='%{{eif\\:t\\:d}}s':"
+             "x=10:y=10:fontsize=36:fontcolor=yellow:box=1:boxcolor=black@0.7:boxborderw=6") if font else ""
+    run([FFMPEG, "-y", "-v", "error", "-i", src, "-vf", f"scale=-2:480,fps=1{clock}",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "32",
          "-c:a", "aac", "-ac", "1", "-b:a", "48k", dst], timeout=600)
     return dst

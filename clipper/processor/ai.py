@@ -158,6 +158,8 @@ Be strict: answer is_viral_moment=false for most excerpts (at least 7 out of 10)
 there is a clear peak - someone laughs hard, screams, is shocked, or something absurd happens on screen -
 that a stranger would understand and share within the first 3 seconds.
 
+The yellow counter in the top-left corner shows the exact second of each frame: read every timestamp
+from it. All times must be between 0 and {duration:.0f}.
 If yes, choose cut points (seconds from the start of THIS video) that include the setup and end right
 after the payoff. Length must be {d['min']}-{d['max']} seconds. Never start mid-sentence.
 facecam_box: bounding box of the streamer webcam overlay as [ymin, xmin, ymax, xmax] scaled 0-1000, or [] if there is none.

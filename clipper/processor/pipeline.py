@@ -60,6 +60,12 @@ def process(cand: dict) -> None:
         # 1. Gemini looks at a cheap 480p/1fps proxy
         proxy = make_proxy(raw, work / "proxy.mp4")
         verdict = ai.gemini_verify(proxy, profile, cand.get("trigger") or "", dur)
+        if verdict.get("is_viral_moment") and float(verdict.get("start_sec") or 0) >= dur - 3:
+            # impossible timestamps: clamping them would silently cut the wrong moment, so ask once more
+            log.warning("candidate %s: Gemini picked %ss in a %.0fs video, asking again", cid, verdict.get("start_sec"), dur)
+            verdict = ai.gemini_verify(proxy, profile, cand.get("trigger") or "", dur)
+            if float(verdict.get("start_sec") or 0) >= dur - 3:
+                verdict = {**verdict, "is_viral_moment": False, "reason": "timestamps outside the video"}
         proxy.unlink(missing_ok=True)
         db.update_candidate(cid, gemini_json=verdict)
         if not verdict.get("is_viral_moment"):

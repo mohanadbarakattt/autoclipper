@@ -223,6 +223,7 @@ def posting_queue(platform: str = "youtube", limit: int = 3):
     hosts = _PLATFORM_HOSTS.get(platform.lower(), (platform.lower(),))
     rows = db.q("SELECT id, streamer_id, viral_score, hook, title, caption, score_json, out_path, scheduled_at, post_url "
                 "FROM candidates WHERE out_path IS NOT NULL AND status IN ('ready','scheduled','drafted','posted') "
+                "AND substr(COALESCE(profile, ''), 1, 7) != 'client_' "  # client work never goes on your channel
                 "ORDER BY scheduled_at IS NULL, scheduled_at")
     out = []
     for r in rows:

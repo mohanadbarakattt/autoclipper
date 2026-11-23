@@ -57,6 +57,7 @@ def build_ass(words: list[dict], hook: str, cap: dict, hk: dict, duration: float
         f"Style: Caption,{cap['font']},{cap['font_size']},{pri},{hi},{out},&H96000000,-1,0,0,0,100,100,{spacing},0,1,7,3,2,70,70,{cap['margin_v']},1",
         # BorderStyle 3 = opaque box: black text on a white pill
         f"Style: Hook,{hk['font']},{hk['font_size']},&H00101010,&H00101010,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,22,0,8,90,90,{hk['margin_v']},1",
+        "Style: Brand,Arial,46,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,4,0,0,0,1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
     if hook:
@@ -72,6 +73,8 @@ def build_ass(words: list[dict], hook: str, cap: dict, hk: dict, duration: float
             for k, ww in enumerate(chunk):
                 t = _esc(ww["word"].upper())
                 toks.append(f"{{\\c{hi}\\fscx112\\fscy112}}{t}{{\\c{pri}\\fscx100\\fscy100}}" if k == j else t)
+            if rtl:  # colour tags split the line into runs that libass lays out left-to-right: flip them so
+                toks.reverse()  # the first Arabic word sits on the right and the highlight moves right-to-left
             lines.append(f"Dialogue: 0,{_ts(start)},{_ts(max(end, start + 0.05))},Caption,,0,0,0,,{' '.join(toks)}")
     return "\n".join(lines) + "\n"
 
@@ -127,8 +130,10 @@ def _zoom(w: int, h: int, payoff: float | None) -> str:
     if payoff is None or payoff < 0:
         return ""
     p0, p1 = max(0.0, payoff - 0.25), payoff + 1.6
-    z = f"1+0.12*clip((it-{p0:.2f})/0.25\\,0\\,1)*clip(({p1:.2f}-it)/0.3\\,0\\,1)"
-    return (f",zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps=30")
+    # scale up per frame, then crop back to size around the centre. (zoompan repeated frames here: a 2 s freeze)
+    z = f"(1+0.12*clip((t-{p0:.2f})/0.25\\,0\\,1)*clip(({p1:.2f}-t)/0.3\\,0\\,1))"
+    return (f",scale=w='2*trunc({w}*{z}/2)':h='2*trunc({h}*{z}/2)':eval=frame:flags=bicubic,"
+            f"crop={w}:{h}:'(iw-{w})/2':'(ih-{h})/2'")
 
 
 def layout_filter(W: int, H: int, mode: str, facecam: list[int] | None, center_x: int | None,
@@ -199,8 +204,23 @@ def render_vertical(src: Path, out: Path, workdir: Path, words: list[dict], hook
         payoff = None
     vf = layout_filter(info["width"], info["height"], mode, verdict.get("facecam_box"), verdict.get("subject_center_x"),
                        track, float(payoff) if payoff is not None else None)
-    vf += f",ass='{rel_ass}':fontsdir='{rel_fonts}'[v]"
-    cmd = [FFMPEG, "-y", "-v", "error", "-i", str(src), "-filter_complex", vf, "-map", "[v]"]
+    # optional branding: {"brand": {"logo": "data/brands/x.png", "handle": "kick.com/x"}} - round logo + handle
+    # under the seam (stacked) or near the top (other layouts), on screen for the whole clip
+    brand = profile.get("brand") or {}
+    logo = (ROOT / brand["logo"]) if brand.get("logo") else None
+    by = TOP_H + 95 if mode == "stacked_facecam" else 150
+    if brand.get("handle"):
+        with ass.open("a", encoding="utf-8") as fh:
+            fh.write(f"Dialogue: 2,{_ts(0)},{_ts(info['duration'] + 1)},Brand,,0,0,0,,"
+                     f"{{\\an4\\pos({150 if logo and logo.exists() else 40},{by + 50})}}{_esc(brand['handle'])}\n")
+    vf += f",ass='{rel_ass}':fontsdir='{rel_fonts}'"
+    inputs = ["-i", str(src)]
+    if logo and logo.exists():
+        inputs += ["-i", str(logo)]
+        vf += f"[base];[1:v]scale=100:100,format=rgba[logo];[base][logo]overlay=36:{by}[v]"
+    else:
+        vf += "[v]"
+    cmd = [FFMPEG, "-y", "-v", "error", *inputs, "-filter_complex", vf, "-map", "[v]"]
     if info["has_audio"]:
         cmd += ["-map", "0:a:0", "-c:a", "aac", "-b:a", "160k", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11"]
     cmd += ["-c:v", "libx264", "-preset", os.getenv("X264_PRESET", "medium"), "-crf", "20", "-pix_fmt", "yuv420p",
