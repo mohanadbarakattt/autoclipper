@@ -113,16 +113,24 @@ def channel_profile(ch: dict, plan: dict) -> dict:
     }
     if ch.get("picky") is not None:
         over["min_viral_score"] = float(ch["picky"])
+    cap = plan.get("max_clip_seconds")
+    if cap:  # the plan's longest clip: the engine never cuts past it
+        d = prof.get("clip_duration") or {"min": 18, "max": 45}
+        mx = max(5, min(int(d.get("max", 45)), int(cap)))
+        over["clip_duration"] = {"min": min(int(d.get("min", 18)), mx), "max": mx}
     if not plan.get("campaign_rules"):
         for k in ("campaign_rules", "required_hashtags", "caption_suffix"):
             prof.pop(k, None)
     return _deep_merge(prof, over)
 
 
-def sync(user_id: int) -> list[dict]:
-    """Write the user's channels + styles into their workspace. Returns the active channels."""
+def sync(user_id: int, max_clip_seconds: int | None = None) -> list[dict]:
+    """Write the user's channels + styles into their workspace. Returns the active channels.
+    max_clip_seconds (from the billing allowance) overrides the plan's own cap when given."""
     user = store.one("SELECT * FROM users WHERE id=?", (user_id,))
     plan = settings.limits(user) if user else settings.plan(None)
+    if max_clip_seconds:
+        plan = {**plan, "max_clip_seconds": int(max_clip_seconds)}
     ws = root(user_id)
     prof_dir = ws / "config" / "profiles"
     prof_dir.mkdir(parents=True, exist_ok=True)

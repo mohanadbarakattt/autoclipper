@@ -38,14 +38,18 @@ def make_user(client, uid="u-1", tier="creator"):
 class FakeVirlo:
     """Stands in for virlo.studio's /api/internal/clips/* endpoints."""
 
-    def __init__(self, balance: int, per_clip: int = 20):
+    def __init__(self, balance: int, per_clip: int = 20, max_clip_seconds: int | None = None):
         self.balance, self.per_clip, self.charged = balance, per_clip, {}
+        self.max_clip_seconds = max_clip_seconds
 
     def __call__(self, url, json=None, headers=None, timeout=None):
         assert headers["Authorization"] == f"Bearer {TOKEN}"
         req = httpx.Request("POST", url)
         if url.endswith("/allowance"):
-            return httpx.Response(200, json={"clips": self.balance // self.per_clip}, request=req)
+            body = {"clips": self.balance // self.per_clip}
+            if self.max_clip_seconds:
+                body["maxClipSeconds"] = self.max_clip_seconds
+            return httpx.Response(200, json=body, request=req)
         key = json["idempotencyKey"]
         if key in self.charged:
             return httpx.Response(200, json={"ok": True}, request=req)
@@ -130,6 +134,25 @@ def test_allowance_fails_closed(client, monkeypatch):
     monkeypatch.setattr(httpx, "post", down)
     u = make_user(client, "offline")
     assert billing.clips_allowed(u) == 0
+
+
+def test_plan_caps_clip_length(client, monkeypatch):
+    """Virlo's maxClipSeconds reaches the engine profile; without it the tier's own cap applies."""
+    import json as _json
+    monkeypatch.setattr(httpx, "post", FakeVirlo(balance=100, max_clip_seconds=25))
+    u = make_user(client, "short", "studio")
+    store.x("INSERT INTO channels (user_id, platform, channel, style, rights_basis, rights_at, created_at)"
+            " VALUES (?,?,?,?,?,?,?)", (u["id"], "kick", "x", "podcast", "own", time.time(), time.time()))
+    plan, clips_left, _ = worker.remaining(u)
+    assert clips_left == 5 and plan["max_clip_seconds"] == 25
+    active = workspace.sync(u["id"], max_clip_seconds=plan["max_clip_seconds"])
+    prof = _json.loads((workspace.root(u["id"]) / "config" / "profiles" / f"c{active[0]['id']}.json").read_text())
+    assert prof["clip_duration"] == {"min": 25, "max": 25}  # podcast is 25-50 s; plan says 25 at most
+    monkeypatch.setattr(httpx, "post", FakeVirlo(balance=100))
+    assert billing.allowance(u)["max_clip_seconds"] == settings.VIRLO_TIERS["studio"]["max_clip_seconds"]
+    workspace.sync(u["id"])
+    prof = _json.loads((workspace.root(u["id"]) / "config" / "profiles" / f"c{active[0]['id']}.json").read_text())
+    assert prof["clip_duration"] == {"min": 25, "max": 50}  # studio allows 180 s, so the style's own range stays
 
 
 def test_service_mode_hides_standalone_pages(client, monkeypatch):

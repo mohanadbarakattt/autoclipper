@@ -25,18 +25,27 @@ def _virlo(path: str, body: dict) -> httpx.Response:
                       headers={"Authorization": f"Bearer {settings.SERVICE_TOKEN}"})
 
 
-def clips_allowed(user: dict) -> int:
-    """How many more finished clips this user can get right now."""
+def allowance(user: dict) -> dict:
+    """What this user's plan covers right now: {"clips": finished clips left, "max_clip_seconds": longest clip}."""
     lim = settings.limits(user)
+    cap = lim.get("max_clip_seconds")
     if lim["billing"] == "local":
-        return max(0, lim["clips"] - store.usage(user["id"], "clip"))
+        return {"clips": max(0, lim["clips"] - store.usage(user["id"], "clip")), "max_clip_seconds": cap}
     try:
         r = _virlo("/api/internal/clips/allowance", {"userId": user["ext_id"]})
         r.raise_for_status()
-        return max(0, int(r.json().get("clips", 0)))
+        j = r.json()
+        sent = j.get("maxClipSeconds")
+        return {"clips": max(0, int(j.get("clips", 0))),
+                "max_clip_seconds": int(sent) if isinstance(sent, (int, float)) and sent > 0 else cap}
     except Exception as e:
         log.warning("allowance check failed for user %s: %s", user["id"], str(e)[:200])
-        return 0  # fail closed: never clip for free because Virlo was unreachable
+        return {"clips": 0, "max_clip_seconds": cap}  # fail closed: never clip for free because Virlo was unreachable
+
+
+def clips_allowed(user: dict) -> int:
+    """How many more finished clips this user can get right now."""
+    return allowance(user)["clips"]
 
 
 def record(user_id: int, clip_ids: list) -> None:

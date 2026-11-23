@@ -61,11 +61,11 @@ PUBLIC_URL = os.getenv("SAAS_PUBLIC_URL", "").rstrip("/")   # e.g. https://clips
 VIRLO_URL = os.getenv("VIRLO_URL", "").rstrip("/")           # e.g. https://virlo.studio
 # Virlo tier -> limits here (clips themselves are paid in Virlo points; `moments` = monthly AI-check cap)
 VIRLO_TIERS: dict[str, dict] = {
-    "free":     {"label": "Free",     "channels": 1,  "scorer": "gemini", "history_days": 7,  "campaign_rules": False, "moments": 300},
-    "creator":  {"label": "Creator",  "channels": 3,  "scorer": "auto",   "history_days": 30, "campaign_rules": True,  "moments": 2000},
-    "pro":      {"label": "Pro",      "channels": 5,  "scorer": "auto",   "history_days": 60, "campaign_rules": True,  "moments": 6000},
-    "studio":   {"label": "Studio",   "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000},
-    "business": {"label": "Business", "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000},
+    "free":     {"label": "Free",     "channels": 1,  "scorer": "gemini", "history_days": 7,  "campaign_rules": False, "moments": 300, "max_clip_seconds": 30},
+    "creator":  {"label": "Creator",  "channels": 3,  "scorer": "auto",   "history_days": 30, "campaign_rules": True,  "moments": 2000, "max_clip_seconds": 60},
+    "pro":      {"label": "Pro",      "channels": 5,  "scorer": "auto",   "history_days": 60, "campaign_rules": True,  "moments": 6000, "max_clip_seconds": 90},
+    "studio":   {"label": "Studio",   "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000, "max_clip_seconds": 180},
+    "business": {"label": "Business", "channels": 15, "scorer": "auto",   "history_days": 90, "campaign_rules": True,  "moments": 15000, "max_clip_seconds": 180},
 }
 
 

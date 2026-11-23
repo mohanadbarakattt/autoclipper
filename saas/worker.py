@@ -24,7 +24,9 @@ BACKOFF = [300, 1200]
 def remaining(user: dict) -> tuple[dict, int, int]:
     """(limits, clips the user can still get, AI checks left this month)."""
     lim = settings.limits(user)
-    return lim, billing.clips_allowed(user), max(0, lim["moments"] - store.usage(user["id"], "moment"))
+    a = billing.allowance(user)
+    lim = {**lim, "max_clip_seconds": a["max_clip_seconds"]}
+    return lim, a["clips"], max(0, lim["moments"] - store.usage(user["id"], "moment"))
 
 
 def enqueue(user_id: int, delay: float = 0) -> int | None:
@@ -71,7 +73,7 @@ def run_job(job: dict) -> None:
         if not user:
             raise RuntimeError("user deleted")
         plan, clips_left, moments_left = remaining(user)
-        active = workspace.sync(uid)
+        active = workspace.sync(uid, max_clip_seconds=plan.get("max_clip_seconds"))
         if not active or not clips_left or not moments_left:
             store.x("UPDATE jobs SET status='done', finished_at=?, result=? WHERE id=?",
                     (time.time(), json.dumps({"skipped": "nothing to do or limit reached"}), job["id"]))
