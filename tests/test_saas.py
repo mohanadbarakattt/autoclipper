@@ -216,3 +216,16 @@ def test_cross_site_post_blocked(client):
     r = client.post("/signup", data={"email": "x@example.com", "password": "password123", "terms": "on"},
                     headers={"origin": "https://evil.example"})
     assert r.status_code == 403
+
+
+def test_loud_windows_survive_muted_vod_stretches():
+    """Twitch mutes parts of VODs (-180 dBFS); that silence must not hide the real loud moments."""
+    import numpy as np
+
+    from clipper.media import loud_windows
+    rng = np.random.default_rng(0)
+    db = -30 + rng.normal(0, 2, 6000)
+    db[1000:2500] = -180.0          # muted stretch
+    db[4000:4010] = -8.0            # a real hype moment
+    picks = loud_windows(db, window=90, top_n=3)
+    assert picks and any(s <= 4000 <= e for s, e, _ in picks)

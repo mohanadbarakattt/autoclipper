@@ -73,7 +73,14 @@ def loud_windows(db: np.ndarray, window: int = 75, top_n: int = 5, min_gap: int 
     """Pick the top non-overlapping windows whose loudness spikes furthest above the stream's norm."""
     if len(db) < window:
         return []
-    z = (db - np.median(db)) / (np.std(db) + 1e-6)
+    # Twitch mutes stretches of VODs (copyrighted music) and streams have breaks: that digital silence is
+    # -180 dBFS and blew up the spread, so no real peak ever looked loud. Floor it and measure the norm on
+    # the parts that have sound.
+    db = np.maximum(db, -60.0)
+    voiced = db[db > -55.0]
+    if len(voiced) < window:
+        return []
+    z = (db - np.median(voiced)) / (np.std(voiced) + 1e-6)
     short = np.convolve(z, np.ones(8) / 8, mode="same")  # 8 s bursts (laughs, screams, hype)
     order = np.argsort(short)[::-1]
     picks: list[tuple[int, int, float]] = []
