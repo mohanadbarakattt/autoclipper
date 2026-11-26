@@ -40,8 +40,11 @@ def enqueue(user_id: int, delay: float = 0) -> int | None:
 def schedule_due() -> int:
     """Queue users whose channels are due for a scan and who still have clips left."""
     cutoff = time.time() - settings.SCAN_MINUTES * 60
-    users = store.q("SELECT DISTINCT u.* FROM users u JOIN channels c ON c.user_id=u.id "
-                    "WHERE c.paused=0 AND c.vods=1 AND (u.last_scan_at IS NULL OR u.last_scan_at < ?)", (cutoff,))
+    # users with an active channel, or a pasted video still waiting (e.g. it was live when pasted)
+    users = store.q("SELECT u.* FROM users u WHERE (u.last_scan_at IS NULL OR u.last_scan_at < ?) AND ("
+                    "EXISTS (SELECT 1 FROM channels c WHERE c.user_id=u.id AND c.paused=0 AND c.vods=1) OR "
+                    "EXISTS (SELECT 1 FROM links l WHERE l.user_id=u.id AND l.status IN ('queued','waiting')))",
+                    (cutoff,))
     n = 0
     for u in users:
         _, clips_left, moments_left = remaining(u)
@@ -66,6 +69,15 @@ def _cmd(ws: Path, clips: int, moments: int, scorer: str, keep_days: int) -> lis
             "--moments", str(moments), "--scorer", scorer, "--keep-days", str(keep_days)]
 
 
+def record_links(results: dict) -> None:
+    """Store what happened to each pasted video in this run (see run_tenant.clip_links)."""
+    now = time.time()
+    for lid, r in results.items():
+        status = r.get("status") if r.get("status") in ("done", "waiting", "failed") else "failed"
+        store.x("UPDATE links SET status=?, found=?, error=?, updated_at=? WHERE id=?",
+                (status, r.get("found"), r.get("error"), now, int(lid)))
+
+
 def run_job(job: dict) -> None:
     uid = job["user_id"]
     user = store.one("SELECT * FROM users WHERE id=?", (uid,))
@@ -74,7 +86,7 @@ def run_job(job: dict) -> None:
             raise RuntimeError("user deleted")
         plan, clips_left, moments_left = remaining(user)
         active = workspace.sync(uid, max_clip_seconds=plan.get("max_clip_seconds"))
-        if not active or not clips_left or not moments_left:
+        if (not active and not workspace.pending_links(uid)) or not clips_left or not moments_left:
             store.x("UPDATE jobs SET status='done', finished_at=?, result=? WHERE id=?",
                     (time.time(), json.dumps({"skipped": "nothing to do or limit reached"}), job["id"]))
             store.x("UPDATE users SET last_scan_at=? WHERE id=?", (time.time(), uid))
@@ -89,6 +101,7 @@ def run_job(job: dict) -> None:
             tail = log_path.read_text(encoding="utf-8", errors="replace")[-800:]
             raise RuntimeError(f"engine exited {p.returncode}: {tail}")
         summary = json.loads(p.stdout.strip().splitlines()[-1])
+        record_links(summary.get("links") or {})
         store.add_usage(uid, "clip", summary.get("rendered", []))
         billing.record(uid, summary.get("rendered", []))
         billing.settle_due(uid)

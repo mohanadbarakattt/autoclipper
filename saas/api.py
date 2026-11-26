@@ -147,9 +147,41 @@ def overview(uid: str):
     u = ext_user(uid)
     status = workspace.stream_status(u["id"])
     chans = store.q("SELECT * FROM channels WHERE user_id=? ORDER BY id", (u["id"],))
+    links = store.q("SELECT * FROM links WHERE user_id=? ORDER BY id DESC LIMIT 20", (u["id"],))
     return {"limits": settings.limits(u), "counts": workspace.counts(u["id"]), "scan": _scan_info(u),
             "channels": [channel_out(c, status) for c in chans],
+            "links": [link_out(x) for x in links],
             "latest": [clip_out(u["id"], c) for c in workspace.clips(u["id"], limit=8)]}
+
+
+def link_out(x: dict) -> dict:
+    return {"id": x["id"], "platform": x["platform"], "url": x["url"], "status": x["status"],
+            "found": x["found"], "error": x["error"], "createdAt": x["created_at"]}
+
+
+# ---------- one box: any link (a video gets clipped once, a channel gets watched) ----------
+class LinkIn(BaseModel):
+    link: str
+    rights: str
+    rightsNote: str = ""
+    style: str = "default"
+    ip: str = ""
+
+
+@router.post("/v1/users/{uid}/links", dependencies=[Depends(service_auth)])
+def add_link(uid: str, body: LinkIn):
+    u = ext_user(uid)
+    try:
+        if workspace.parse_video(body.link):
+            link = workspace.add_link(u, body.link, body.rights)
+            store.x("UPDATE users SET last_scan_at=NULL WHERE id=?", (u["id"],))
+            worker.enqueue(u["id"])
+            return {"kind": "video", "link": link_out(link)}
+        ch = workspace.add_channel(u, body.link, "", body.style, body.rights, body.rightsNote, body.ip)
+    except workspace.ChannelError as e:
+        raise ApiError(400, "link_rejected", str(e))
+    worker.enqueue(u["id"])
+    return {"kind": "channel", "channel": channel_out(ch, {})}
 
 
 # ---------- channels ----------

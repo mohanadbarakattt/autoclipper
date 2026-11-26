@@ -15,6 +15,29 @@ import time
 from pathlib import Path
 
 
+def clip_links(ws: Path, vod, db) -> dict[str, dict]:
+    """Find the best moments in each pasted video (config/links.json). Returns {link id: {status, found}}:
+    done = moments cut (0 is possible), waiting = still live / not ready yet, failed = couldn't read it."""
+    f = ws / "config" / "links.json"
+    out: dict[str, dict] = {}
+    if not f.exists():
+        return out
+    for link in json.loads(f.read_text(encoding="utf-8") or "[]"):
+        s = {"id": f"link:{link['platform']}", "platform": link["platform"], "profile": "links"}
+        key = f"{link['platform']}:{link['video_id']}"
+        try:
+            vod.process_vod(s, {"id": link["video_id"], "url": link["url"]}, eager=True)
+        except Exception as e:  # one bad link never stops the others
+            out[str(link["id"])] = {"status": "failed", "error": str(e)[:300]}
+            continue
+        if db.vod_seen(key):
+            n = db.q("SELECT COUNT(*) n FROM candidates WHERE source_ref=?", (link["url"],))[0]["n"]
+            out[str(link["id"])] = {"status": "done", "found": n}
+        else:
+            out[str(link["id"])] = {"status": "waiting"}
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workspace", required=True)
@@ -43,11 +66,12 @@ def main(argv: list[str] | None = None) -> int:
     from clipper.processor import pipeline
 
     db.conn()
-    summary = {"found": 0, "checked": 0, "rendered": [], "checked_ids": [], "stopped": None}
+    summary = {"found": 0, "checked": 0, "rendered": [], "checked_ids": [], "stopped": None, "links": {}}
     before = {r["id"] for r in db.q("SELECT id FROM candidates")}
     if not a.skip_scan and a.clips > 0 and a.moments > 0:
         from clipper.ingest import vod
         vod.poll_all()
+        summary["links"] = clip_links(ws, vod, db)
     summary["found"] = len({r["id"] for r in db.q("SELECT id FROM candidates")} - before)
 
     def finished() -> set[int]:

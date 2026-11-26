@@ -151,7 +151,9 @@ def audio_windows(url: str, key: str, profile: dict) -> list[tuple[float, float,
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def process_vod(s: dict, entry: dict) -> None:
+def process_vod(s: dict, entry: dict, eager: bool = False) -> None:
+    """eager: a video the user pasted on purpose. Don't wait for YouTube's heatmap, skip the channel's
+    title/category filter, and raise when the video can't be read instead of silently retrying later."""
     key = f"{s['platform']}:{entry['id']}"
     if db.vod_seen(key):
         return
@@ -162,6 +164,8 @@ def process_vod(s: dict, entry: dict) -> None:
         url = f"https://www.youtube.com/watch?v={entry['id']}"
     info = ytdlp_json(url, timeout=120)
     if not info:
+        if eager:
+            raise RuntimeError("couldn't open this video (private, removed or region-locked?)")
         return
     if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming", "post_live"):
         return  # still live / still processing: the live worker owns it, check later
@@ -170,7 +174,7 @@ def process_vod(s: dict, entry: dict) -> None:
         db.mark_vod_seen(key, s["id"])
         return
     profile = load_profile(s["profile"])
-    if not platforms.matches_filter({"title": info.get("title", ""), "category": ", ".join(info.get("categories") or [])}, profile):
+    if not eager and not platforms.matches_filter({"title": info.get("title", ""), "category": ", ".join(info.get("categories") or [])}, profile):
         db.mark_vod_seen(key, s["id"])
         return
 
@@ -181,7 +185,7 @@ def process_vod(s: dict, entry: dict) -> None:
             if not wins:
                 wins, method = chat_replay_windows(url, key, profile, info.get("duration") or 0), "chat replay spike"
         age_h = (time.time() - (info.get("timestamp") or info.get("release_timestamp") or time.time())) / 3600
-        if not wins and age_h < 48:
+        if not wins and age_h < 48 and not eager:
             log.info("%s has no heatmap yet - retry later", key)
             return
     elif s["platform"] == "twitch" and platforms.TWITCH.configured:

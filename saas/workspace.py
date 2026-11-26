@@ -3,6 +3,7 @@
 saas_data/workspaces/u<id>/
     config/streamers.json        <- the user's channels (written here)
     config/profiles/c<chan>.json <- the channel's style (engine profile + user overrides)
+    config/links.json            <- single videos the user pasted, waiting to be clipped (profile: links.json)
     data/state/clipper.db        <- written by the engine; read here
     data/ready_clips/*.mp4       <- finished clips
 """
@@ -15,7 +16,7 @@ import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from . import settings, store
 
@@ -67,6 +68,40 @@ def parse_channel(text: str, platform_hint: str = "") -> tuple[str, str]:
     if hint not in PLATFORMS:
         raise ChannelError("Paste the full channel link (twitch.tv/…, kick.com/… or youtube.com/@…).")
     return hint, _clean(t.lstrip("@"), hint)
+
+
+_YT_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_KICK_ID = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+
+
+def parse_video(text: str) -> tuple[str, str, str] | None:
+    """A single video / past-stream link -> (platform, video_id, canonical url); None when it isn't one.
+    'https://twitch.tv/videos/123' -> ('twitch', 'v123', ...); 'youtu.be/abcdefghijk' -> ('youtube', 'abcdefghijk', ...)."""
+    t = (text or "").strip()
+    if "://" not in t and "." in t.split("/")[0]:
+        t = "https://" + t
+    if "://" not in t:
+        return None
+    u = urlparse(t)
+    host = (u.hostname or "").lower().removeprefix("www.").removeprefix("m.")
+    parts = [p for p in u.path.split("/") if p]
+    if host == "twitch.tv" and len(parts) >= 2 and parts[0] == "videos" and parts[1].isdigit():
+        return "twitch", f"v{parts[1]}", f"https://www.twitch.tv/videos/{parts[1]}"
+    if host == "kick.com":
+        vid = parts[1] if len(parts) >= 2 and parts[0] == "video" else parts[2] if len(parts) >= 3 and parts[1] == "videos" else ""
+        if vid and _KICK_ID.match(vid):
+            return "kick", vid, t.split("?")[0]
+    yt = ""
+    if host == "youtu.be" and parts:
+        yt = parts[0]
+    elif host in ("youtube.com", "music.youtube.com"):
+        if parts[:1] == ["watch"]:
+            yt = (parse_qs(u.query).get("v") or [""])[0]
+        elif len(parts) >= 2 and parts[0] in ("shorts", "live", "embed"):
+            yt = parts[1]
+    if yt and _YT_ID.match(yt):
+        return "youtube", yt, f"https://www.youtube.com/watch?v={yt}"
+    return None
 
 
 def _clean(name: str, platform: str) -> str:
@@ -149,7 +184,16 @@ def sync(user_id: int, max_clip_seconds: int | None = None) -> list[dict]:
         if f.name not in keep:
             f.unlink(missing_ok=True)
     (ws / "config" / "streamers.json").write_text(json.dumps({"streamers": streamers}, indent=2), encoding="utf-8")
+    # single pasted videos: one shared "links" profile (general style, the plan's clip-length cap)
+    (prof_dir / "links.json").write_text(
+        json.dumps(channel_profile({"id": "links", "style": "default", "picky": None}, plan), indent=2), encoding="utf-8")
+    (ws / "config" / "links.json").write_text(json.dumps(pending_links(user_id), indent=2), encoding="utf-8")
     return active
+
+
+def pending_links(user_id: int) -> list[dict]:
+    return store.q("SELECT id, platform, url, video_id FROM links WHERE user_id=? AND status IN ('queued','waiting') "
+                   "ORDER BY id", (user_id,))
 
 
 def delete(user_id: int) -> None:
@@ -327,3 +371,28 @@ def add_channel(user: dict, link: str, platform: str, style: str, rights: str, n
     sync(user["id"])
     store.x("UPDATE users SET last_scan_at=NULL WHERE id=?", (user["id"],))
     return store.one("SELECT * FROM channels WHERE id=?", (cid,))
+
+
+def add_link(user: dict, link: str, rights: str) -> dict:
+    """Queue one video / past stream to clip. Raises ChannelError with a user-facing reason."""
+    import time
+    parsed = parse_video(link)
+    if not parsed:
+        raise ChannelError("That isn't a video link. Paste a YouTube, Twitch or Kick video, or a channel link.")
+    if rights not in RIGHTS:
+        raise ChannelError("Tell us why you can clip this video.")
+    plat, vid, url = parsed
+    same = store.one("SELECT * FROM links WHERE user_id=? AND platform=? AND video_id=?", (user["id"], plat, vid))
+    now = time.time()
+    if same and same["status"] in ("queued", "waiting"):
+        return same
+    if same and same["status"] == "failed":  # pasting it again retries
+        store.x("UPDATE links SET status='queued', error=NULL, updated_at=? WHERE id=?", (now, same["id"]))
+        sync(user["id"])
+        return store.one("SELECT * FROM links WHERE id=?", (same["id"],))
+    if same:
+        raise ChannelError("You already clipped this video.")
+    lid = store.x("INSERT INTO links (user_id, platform, url, video_id, rights_basis, created_at, updated_at)"
+                  " VALUES (?,?,?,?,?,?,?)", (user["id"], plat, url, vid, rights, now, now))
+    sync(user["id"])
+    return store.one("SELECT * FROM links WHERE id=?", (lid,))

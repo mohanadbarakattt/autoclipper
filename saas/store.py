@@ -73,6 +73,19 @@ CREATE TABLE IF NOT EXISTS charges (
     created_at REAL NOT NULL,
     PRIMARY KEY (user_id, clip_id)
 );
+CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    platform TEXT NOT NULL,
+    url TEXT NOT NULL,
+    video_id TEXT NOT NULL,
+    rights_basis TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',   -- queued | waiting (still live) | done | failed
+    found INTEGER,
+    error TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS blocked_channels (
     platform TEXT NOT NULL,
     channel TEXT NOT NULL,

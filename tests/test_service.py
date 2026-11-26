@@ -160,3 +160,65 @@ def test_service_mode_hides_standalone_pages(client, monkeypatch):
     assert client.get("/signup").status_code == 404
     assert client.get("/health").status_code == 200
     assert client.put("/v1/users/x", json={"tier": "free"}, headers=H).status_code == 200
+
+
+# ---------- one box: paste any link ----------
+@pytest.mark.parametrize("text,expected", [
+    ("https://www.twitch.tv/videos/2937733476", ("twitch", "v2937733476", "https://www.twitch.tv/videos/2937733476")),
+    ("twitch.tv/videos/123?t=1h2m", ("twitch", "v123", "https://www.twitch.tv/videos/123")),
+    ("https://youtu.be/dQw4w9WgXcQ?si=x", ("youtube", "dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")),
+    ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=30", ("youtube", "dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")),
+    ("https://youtube.com/shorts/dQw4w9WgXcQ", ("youtube", "dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")),
+    ("https://www.youtube.com/live/dQw4w9WgXcQ", ("youtube", "dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ")),
+    ("https://kick.com/video/0f3c1d2e-aaaa-bbbb-cccc-1234567890ab", ("kick", "0f3c1d2e-aaaa-bbbb-cccc-1234567890ab", "https://kick.com/video/0f3c1d2e-aaaa-bbbb-cccc-1234567890ab")),
+    ("https://kick.com/xqc/videos/0f3c1d2e-aaaa-bbbb-cccc-1234567890ab", ("kick", "0f3c1d2e-aaaa-bbbb-cccc-1234567890ab", "https://kick.com/xqc/videos/0f3c1d2e-aaaa-bbbb-cccc-1234567890ab")),
+])
+def test_parse_video(text, expected):
+    assert workspace.parse_video(text) == expected
+
+
+@pytest.mark.parametrize("text", ["https://twitch.tv/kaicenat", "https://kick.com/xqc", "https://youtube.com/@MrBeast",
+                                  "https://example.com/watch?v=dQw4w9WgXcQ", "not a link"])
+def test_channel_links_are_not_videos(text):
+    assert workspace.parse_video(text) is None
+
+
+def test_paste_video_then_channel(client, monkeypatch):
+    monkeypatch.setattr(worker, "enqueue", lambda *a, **k: 1)
+    make_user(client, "u-links", "creator")
+    r = client.post("/v1/users/u-links/links", json={"link": "https://youtu.be/dQw4w9WgXcQ", "rights": "own"}, headers=H)
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "video" and r.json()["link"]["status"] == "queued"
+    # pasting the same video again doesn't add it twice
+    again = client.post("/v1/users/u-links/links", json={"link": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "rights": "own"}, headers=H)
+    assert again.json()["link"]["id"] == r.json()["link"]["id"]
+    ch = client.post("/v1/users/u-links/links", json={"link": "https://twitch.tv/someone", "rights": "own"}, headers=H)
+    assert ch.status_code == 200 and ch.json()["kind"] == "channel"
+    bad = client.post("/v1/users/u-links/links", json={"link": "https://youtu.be/dQw4w9WgXcQ", "rights": "nope"}, headers=H)
+    assert bad.status_code == 400  # a reason is always required
+    ov = client.get("/v1/users/u-links/overview", headers=H).json()
+    assert len(ov["links"]) == 1 and len(ov["channels"]) == 1
+    # the workspace lists the pending video for the engine
+    u = store.one("SELECT * FROM users WHERE ext_id='u-links'")
+    import json as _json
+    pending = _json.loads((workspace.root(u["id"]) / "config" / "links.json").read_text())
+    assert pending[0]["video_id"] == "dQw4w9WgXcQ"
+    assert (workspace.root(u["id"]) / "config" / "profiles" / "links.json").exists()
+
+
+def test_link_needs_rights_and_records_results(client, monkeypatch):
+    monkeypatch.setattr(worker, "enqueue", lambda *a, **k: 1)
+    make_user(client, "u-l2", "creator")
+    r = client.post("/v1/users/u-l2/links", json={"link": "https://www.twitch.tv/videos/99", "rights": "nope"}, headers=H)
+    assert r.status_code == 400
+    lid = client.post("/v1/users/u-l2/links", json={"link": "https://www.twitch.tv/videos/99", "rights": "own"}, headers=H).json()["link"]["id"]
+    worker.record_links({str(lid): {"status": "done", "found": 4}})
+    u = store.one("SELECT * FROM users WHERE ext_id='u-l2'")
+    assert workspace.pending_links(u["id"]) == []
+    out = client.get("/v1/users/u-l2/overview", headers=H).json()["links"][0]
+    assert out["status"] == "done" and out["found"] == 4
+    # a failed one can be retried by pasting it again
+    worker.record_links({str(lid): {"status": "failed", "error": "x"}})
+    store.x("UPDATE links SET status='failed' WHERE id=?", (lid,))
+    again = client.post("/v1/users/u-l2/links", json={"link": "https://www.twitch.tv/videos/99", "rights": "own"}, headers=H)
+    assert again.json()["link"]["status"] == "queued"
