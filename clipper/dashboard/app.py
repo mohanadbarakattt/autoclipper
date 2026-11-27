@@ -16,8 +16,10 @@ from ..config import (DATA_DIR, READY_DIR, list_profiles, load_profile, load_str
                       save_streamers)
 from ..processor import ai, pipeline
 from ..processor.publish import TryPost
+from .security import BrowserGuard
 
 app = FastAPI(title="AutoClipper")
+app.add_middleware(BrowserGuard)  # no password: refuse requests coming from other websites (see security.py)
 app.mount("/media", StaticFiles(directory=str(READY_DIR)), name="media")
 STATIC = Path(__file__).parent / "static"
 STARTED = time.time()

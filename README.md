@@ -115,6 +115,16 @@ Never forward the port on your router or put it on a public server without your 
 
 With Docker, use `0.0.0.0` or an IP address (not a host name), then run `docker compose up -d`.
 
+Websites open in your browser can't use the dashboard: it refuses changes sent by another site, and it only
+answers to IP addresses, `localhost`, your computer's name and (once opened to your network) local names like
+`mypc.local`. `curl`, scripts and AI agents work as before. If you open it under any other name (Tailscale,
+router DNS name, your own reverse proxy), add it to `.env` and restart. A reverse proxy should pass the
+original `Host` header on.
+
+```
+DASHBOARD_ALLOWED_HOSTS=clips.example.com
+```
+
 ## 🔍 How it works
 
 <img src="docs/images/pipeline.svg" alt="Pipeline: watch, detect, verify, score, render, deliver" width="100%">

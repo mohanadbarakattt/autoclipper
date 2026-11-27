@@ -35,6 +35,8 @@ DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8090"))
 # The dashboard has no password, so only this computer can open it unless you say otherwise.
 # (empty must not reach uvicorn: it would listen on every network interface)
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "").strip() or "127.0.0.1"
+# extra names the dashboard answers to, comma separated (see dashboard/security.py)
+DASHBOARD_ALLOWED_HOSTS = os.getenv("DASHBOARD_ALLOWED_HOSTS", "").replace(",", " ").split()
 VOD_POLL_MINUTES = int(os.getenv("VOD_POLL_MINUTES", "30"))
 # off = never record live streams (saves ~6-8 Mbps per stream); clips come only from finished streams
 LIVE_RECORDING = os.getenv("LIVE_RECORDING", "on").strip().lower() not in ("off", "0", "false", "no")
