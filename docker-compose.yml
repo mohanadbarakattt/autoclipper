@@ -5,7 +5,11 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
-    ports: ["8090:8090"]
+    environment:
+      # inside the container it must listen on all interfaces; "ports" below decides who can reach it
+      DASHBOARD_HOST: 0.0.0.0
+    # the dashboard has no password: this computer only, unless DASHBOARD_HOST in .env says otherwise
+    ports: ["${DASHBOARD_HOST:-127.0.0.1}:8090:8090"]
     volumes:
       - ./config:/app/config
       - ./data:/app/data
@@ -16,9 +20,11 @@ services:
     image: ghcr.io/trypostit/trypost:2
     restart: unless-stopped
     env_file: trypost.env
+    # this computer only (it is seeded with a default password); the clipper and cloudflared use the
+    # compose network, so they don't need these. Override with TRYPOST_HOST in .env.
     ports:
-      - "8000:80"     # web app + REST API + MCP (/mcp/trypost)
-      - "8081:8080"   # Reverb websocket
+      - "${TRYPOST_HOST:-127.0.0.1}:8000:80"     # web app + REST API + MCP (/mcp/trypost)
+      - "${TRYPOST_HOST:-127.0.0.1}:8081:8080"   # Reverb websocket
     volumes:
       - trypost-storage:/var/www/html/storage/app
     depends_on: [pgsql, redis]

@@ -12,8 +12,8 @@ from pathlib import Path
 import uvicorn
 
 from . import db
-from .config import (LIVE_RECORDING, CANDIDATES_DIR, DASHBOARD_PORT, KEEP_PUBLISHED_DAYS, READY_DIR, VOD_POLL_MINUTES, WORK_DIR,
-                     load_streamers)
+from .config import (LIVE_RECORDING, CANDIDATES_DIR, DASHBOARD_HOST, DASHBOARD_PORT, KEEP_PUBLISHED_DAYS, READY_DIR,
+                     VOD_POLL_MINUTES, WORK_DIR, load_streamers)
 from .dashboard.app import EVENTS, app
 from .ingest import vod
 from .ingest.live import LiveWorker
@@ -121,15 +121,26 @@ async def discover_loop() -> None:
         await asyncio.sleep(int(os.getenv("DISCOVER_MINUTES", "60")) * 60)
 
 
+def dashboard_url(host: str, port: int) -> str:
+    """The address to open on this computer (a specific network IP doesn't answer on localhost)."""
+    if host in ("0.0.0.0", "127.0.0.1", "::", "::1"):
+        host = "localhost"
+    return f"http://{f'[{host}]' if ':' in host else host}:{port}"
+
+
 async def main(mode: str) -> None:
     db.conn()
     tasks = []
     if mode in ("all", "worker"):
         tasks += [live_supervisor(), vod_loop(), processor_loop(), cleanup_loop(), discover_loop()]
     if mode in ("all", "dashboard"):
-        server = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=DASHBOARD_PORT, log_level="warning"))
+        server = uvicorn.Server(uvicorn.Config(app, host=DASHBOARD_HOST, port=DASHBOARD_PORT, log_level="warning"))
         tasks.append(server.serve())
-        log.info("dashboard on http://localhost:%s", DASHBOARD_PORT)
+        log.info("dashboard on %s (listening on %s)", dashboard_url(DASHBOARD_HOST, DASHBOARD_PORT), DASHBOARD_HOST)
+        # inside Docker the container must listen on 0.0.0.0; docker-compose.yml decides who can reach it
+        if DASHBOARD_HOST not in ("127.0.0.1", "localhost", "::1") and not Path("/.dockerenv").exists():
+            log.warning("the dashboard has no password: anyone who can reach this computer on port %s can control it",
+                        DASHBOARD_PORT)
     await asyncio.gather(*tasks)
 
 

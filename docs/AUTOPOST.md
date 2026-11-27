@@ -35,6 +35,10 @@ python scripts/setup.py --public-url https://post.yourdomain.com
 
 From now on it runs by itself and restarts after reboots (Docker Desktop: enable *Start when you sign in*).
 
+The dashboard (8090) and TryPost (8000, 8081) answer only on this computer. A Cloudflare Tunnel or ngrok
+still reaches TryPost. To open them from your network, see `DASHBOARD_HOST` and `TRYPOST_HOST` in
+[.env.example](../.env.example).
+
 ## OpenBot (optional manager)
 Paste the prompt in [../openbot/ROUTINES.md](../openbot/ROUTINES.md) into OpenBot for a daily digest,
 self-healing and chat-style channel management.

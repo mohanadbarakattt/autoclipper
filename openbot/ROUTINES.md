@@ -30,3 +30,7 @@ TryPost: http://localhost:8000). Set up two persistent routines:
 
 Optional: TryPost also exposes an MCP server at `http://localhost:8000/mcp/trypost` (OAuth sign-in),
 so OpenBot or Claude can read post status and analytics directly.
+
+Run OpenBot on the same computer: the dashboard and TryPost answer only on `localhost` by default. If it
+runs on another machine, see [who can open the dashboard](../README.md#who-can-open-it) (and `TRYPOST_HOST`
+in `.env.example`).

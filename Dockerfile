@@ -17,6 +17,9 @@ COPY clipper ./clipper
 COPY scripts ./scripts
 RUN python scripts/get_fonts.py
 
+# listen on all interfaces inside the container, or published ports can't reach it.
+# With plain `docker run`, publish to this computer only: -p 127.0.0.1:8090:8090
+ENV DASHBOARD_HOST=0.0.0.0
 EXPOSE 8090
 HEALTHCHECK --interval=60s --timeout=10s --start-period=60s \
   CMD curl -fs http://localhost:8090/api/overview > /dev/null || exit 1

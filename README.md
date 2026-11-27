@@ -99,6 +99,22 @@ Requires Python 3.10+ and FFmpeg on your PATH.
 - **Posting schedule**: each finished clip gets a slot, best clips first (your local time is shown too). **Download**, **Copy caption**, then **Mark posted** and paste the post link so it can track views.
 - **Clip pipeline**: every candidate and why it passed or got rejected.
 
+### Who can open it
+
+**Only the computer AutoClipper runs on.** The dashboard has no password, so it listens on `127.0.0.1`.
+
+To open it from your phone or another PC on a network you trust, add this line to `.env` and restart:
+
+```
+DASHBOARD_HOST=0.0.0.0
+```
+
+Then go to `http://<your computer's IP>:8090` (Windows may ask you to allow it through the firewall).
+Anyone who can reach that address can watch and delete clips and change your streamers and profiles.
+Never forward the port on your router or put it on a public server without your own password in front.
+
+With Docker, use `0.0.0.0` or an IP address (not a host name), then run `docker compose up -d`.
+
 ## 🔍 How it works
 
 <img src="docs/images/pipeline.svg" alt="Pipeline: watch, detect, verify, score, render, deliver" width="100%">
@@ -151,7 +167,8 @@ Copy one to start a new niche; any key you leave out uses the default in `clippe
 | `language` | `en`, `ar`, … or leave empty to auto-detect |
 | `follow_action`, `payoff_zoom` | Moving crop and punchline zoom on/off |
 
-Useful `.env` options: `EXPORT_DIR` (Google Drive folder), `MAX_LIVE_RECORDINGS`, `SCORER` (`auto` / `gemini` / `claude`).
+Useful `.env` options: `EXPORT_DIR` (Google Drive folder), `MAX_LIVE_RECORDINGS`, `SCORER` (`auto` / `gemini` / `claude`),
+`DASHBOARD_HOST` ([who can open the dashboard](#who-can-open-it)).
 
 **Optional free platform keys** (better signals): [Twitch app](https://dev.twitch.tv/console/apps) for game
 filtering, viewer-clip peaks and Twitch auto-discovery; [Kick app](https://kick.com/settings/developer) for
