@@ -190,20 +190,37 @@ def claude_bin() -> str | None:
     return os.getenv("CLAUDE_BIN") or shutil.which("claude")
 
 
+# A scoring call needs none of your Claude Code setup. Without these flags every call also loads your plugins,
+# MCP servers, skills and CLAUDE.md (20,000+ tokens of your plan's limit for a ~500 token question).
+# --no-session-persistence also keeps thousands of scoring chats out of your Claude Code history.
+_CLAUDE_LEAN = ["--safe-mode", "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
+                "--no-session-persistence",
+                "--system-prompt", "You rate short video clips. Reply with only the JSON asked for."]
+_CLAUDE_PLAIN = ["--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task"]
+_claude_lean_ok = True
+
+
 def claude_json(prompt: str, timeout: int = 240) -> dict:
+    global _claude_lean_ok
     exe = claude_bin()
     if not exe:
         raise RuntimeError("claude CLI not found")
-    cmd = [exe, "-p", "--output-format", "json", "--model", CLAUDE_MODEL,
-           "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task"]
     env = dict(os.environ)
     if not env.get("CLAUDE_CODE_OAUTH_TOKEN"):
         env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)  # empty value would override the normal `claude` login
     from .. import guard
     guard.add("claude")
     with tempfile.TemporaryDirectory() as cwd:  # empty dir: nothing for it to touch
-        p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=timeout, cwd=cwd, env=env)
+        def call(flags: list[str]):
+            return subprocess.run([exe, "-p", "--output-format", "json", "--model", CLAUDE_MODEL, *flags],
+                                  input=prompt, capture_output=True, text=True, encoding="utf-8",
+                                  errors="replace", timeout=timeout, cwd=cwd, env=env)
+
+        p = call(_CLAUDE_LEAN if _claude_lean_ok else _CLAUDE_PLAIN)
+        if _claude_lean_ok and p.returncode != 0 and "unknown option" in (p.stderr or "").lower():
+            log.warning("old Claude Code version: update it (claude update) to use far less of your plan per clip")
+            _claude_lean_ok = False
+            p = call(_CLAUDE_PLAIN)
     if p.returncode != 0:
         raise RuntimeError(f"claude CLI failed: {(p.stderr or p.stdout)[-800:]}")
     out = json.loads(p.stdout)

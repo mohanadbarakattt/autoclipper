@@ -109,6 +109,18 @@ def ensure_gemini() -> None:
     print("Saved.")
 
 
+def claude_ping(exe: str, env: dict | None = None) -> subprocess.CompletedProcess:
+    """Cheapest possible "are you logged in?" call: no plugins, MCP servers, tools or saved chat."""
+    lean = ["--safe-mode", "--tools", "", "--strict-mcp-config", "--no-session-persistence",
+            "--system-prompt", "Answer briefly."]
+    for flags in (lean, []):  # [] = older Claude Code that doesn't know the lean flags
+        p = subprocess.run([exe, "-p", "Reply with only the word OK", *flags], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=90, env=env, stdin=subprocess.DEVNULL)
+        if "unknown option" not in (p.stderr or "").lower():
+            break
+    return p
+
+
 def check_claude() -> None:
     exe = shutil.which("claude")
     if not exe:
@@ -120,8 +132,7 @@ def check_claude() -> None:
     if env_get("CLAUDE_CODE_OAUTH_TOKEN"):
         env["CLAUDE_CODE_OAUTH_TOKEN"] = env_get("CLAUDE_CODE_OAUTH_TOKEN")
     try:
-        p = subprocess.run([exe, "-p", "Reply with only the word OK"], capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=90, env=env, stdin=subprocess.DEVNULL)
+        p = claude_ping(exe, env)
         if "OK" in (p.stdout or ""):
             print("Claude is ready.")
             return
@@ -139,8 +150,7 @@ def check_claude() -> None:
     print("then type  /exit  and press Enter to come back here.\n")
     input("Press Enter to open Claude...")
     subprocess.run([exe], cwd=str(ROOT))
-    p = subprocess.run([exe, "-p", "Reply with only the word OK"], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=90, stdin=subprocess.DEVNULL)
+    p = claude_ping(exe)
     print("Claude is ready." if "OK" in (p.stdout or "") else "Still not logged in -> Gemini will do the scoring for now.")
 
 
